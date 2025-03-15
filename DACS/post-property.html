@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng tin - Thông Thành BĐS</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <!-- Header (Navbar) -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="index.html">Thông Thành BĐS</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html">Trang chủ</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="search.html">Tìm kiếm</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="post-property.html">Đăng tin</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="register.html">Đăng ký</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Nội dung chính -->
+    <div class="main-content">
+        <!-- Form đăng tin -->
+        <section class="post-property-section py-5">
+            <div class="container">
+                <h2 class="text-center mb-5">Đăng tin bất động sản</h2>
+                <form class="bg-light p-4 rounded shadow">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Tiêu đề</label>
+                        <input type="text" class="form-control" id="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Mô tả</label>
+                        <textarea class="form-control" id="description" rows="5" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="price" class="form-label">Giá</label>
+                        <input type="number" class="form-control" id="price" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Địa chỉ</label>
+                        <input type="text" class="form-control" id="location" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="image" class="form-label">Chọn ảnh</label>
+                        <input type="file" class="form-control" id="image" accept="image/*" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Đăng tin</button>
+                </form>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white py-4">
+        <div class="container text-center">
+            <p>&copy; 2025 Thông Thành BĐS. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS và Popper.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
+    <!-- Custom JS -->
+    <script src="scripts/main.js"></script>
+</body>
+</html>
