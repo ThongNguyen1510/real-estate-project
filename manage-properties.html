@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý tin đăng - Thông Thành BĐS</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="styles/main.css">
+    <style>
+        .manage-properties-section {
+            background-color: #f8f9fa;
+            min-height: 70vh;
+        }
+        
+        .empty-state {
+            background: white;
+            border-radius: 12px;
+            padding: 40px 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .property-card {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+
+        .property-card:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header (Navbar) -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="index.html">Thông Thành BĐS</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html">Trang chủ</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="post-property.html">Đăng tin</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="manage-properties.html">Quản lý tin đăng</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="register.html">Đăng ký</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="login.html">Đăng nhập</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content" style="padding-top: 80px;">
+        <section class="manage-properties-section py-5">
+            <div class="container">
+                <!-- Header Section -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="mb-0">Quản lý tin đăng</h2>
+                    <div class="d-flex gap-3">
+                        <button class="btn btn-outline-secondary">
+                            <i class="fas fa-filter"></i> Lọc tin
+                        </button>
+                        <a href="post-property.html" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Đăng tin mới
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="empty-state text-center py-5">
+                    <h4 class="mb-3">Bạn chưa có tin đăng nào</h4>
+                    <p class="text-muted mb-4">Hãy bắt đầu bằng cách đăng tin mới để khách hàng có thể xem được BĐS của bạn</p>
+                    <a href="post-property.html" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus me-2"></i> Đăng tin ngay
+                    </a>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white py-4">
+        <div class="container text-center">
+            <p>&copy; 2023 Thông Thành BĐS. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS và Popper.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
+    <!-- Custom JS -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Lấy đường dẫn hiện tại
+            const currentPath = window.location.pathname.split('/').pop();
+
+            // Danh sách các mục header
+            const navItems = document.querySelectorAll('.navbar-nav .nav-item');
+
+            navItems.forEach(item => {
+                const link = item.querySelector('.nav-link');
+                const href = link.getAttribute('href');
+
+                // Kiểm tra nếu đường dẫn trùng khớp
+                if (href === currentPath) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
