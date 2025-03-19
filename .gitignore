@@ -1,10 +1,10 @@
 # Bỏ qua file .env để tránh lộ thông tin nhạy cảm
 .env
 
-# Bỏ qua thư mục node_modules để tránh commit thư viện không cần thiết
+# Bỏ qua thư mục node_modules để tránh commit các thư viện không cần thiết
 node_modules/
 
-# Bỏ qua log và cache
+# Bỏ qua các file log và cache
 npm-debug.log
 yarn-debug.log
 yarn-error.log
