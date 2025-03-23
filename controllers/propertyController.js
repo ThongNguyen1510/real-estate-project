@@ -98,49 +98,82 @@ async function deleteProperty(req, res) {
 
 // Search and filter properties
 async function searchProperties(req, res) {
-  const { priceMin, priceMax, areaMin, areaMax, property_type, bedrooms, bathrooms } = req.query;
+  const {
+    city,
+    district,
+    ward,
+    price_min,
+    price_max,
+    area_min,
+    area_max,
+    bedrooms,
+    bathrooms,
+    property_type,
+    amenities
+  } = req.query;
 
   try {
     const pool = await connectToDatabase();
-    let query = "SELECT * FROM Properties WHERE 1=1";
-    const inputs = [];
+    const request = pool.request();
 
-    if (priceMin) {
-      query += " AND price >= @priceMin";
-      inputs.push({ name: "priceMin", type: sql.Decimal(18, 2), value: priceMin });
+    // Build SQL query dynamically
+    let query = `
+      SELECT p.*, l.city, l.district, l.ward, l.street
+      FROM Properties p
+      INNER JOIN Locations l ON p.location_id = l.id
+      WHERE 1=1
+    `;
+
+    if (city) {
+      query += ` AND l.city = @city`;
+      request.input('city', sql.NVarChar, city);
     }
-    if (priceMax) {
-      query += " AND price <= @priceMax";
-      inputs.push({ name: "priceMax", type: sql.Decimal(18, 2), value: priceMax });
+    if (district) {
+      query += ` AND l.district = @district`;
+      request.input('district', sql.NVarChar, district);
     }
-    if (areaMin) {
-      query += " AND area >= @areaMin";
-      inputs.push({ name: "areaMin", type: sql.Decimal(18, 2), value: areaMin });
+    if (ward) {
+      query += ` AND l.ward = @ward`;
+      request.input('ward', sql.NVarChar, ward);
     }
-    if (areaMax) {
-      query += " AND area <= @areaMax";
-      inputs.push({ name: "areaMax", type: sql.Decimal(18, 2), value: areaMax });
+    if (price_min) {
+      query += ` AND p.price >= @price_min`;
+      request.input('price_min', sql.Decimal(18, 2), price_min);
     }
-    if (property_type) {
-      query += " AND property_type = @property_type";
-      inputs.push({ name: "property_type", type: sql.NVarChar, value: property_type });
+    if (price_max) {
+      query += ` AND p.price <= @price_max`;
+      request.input('price_max', sql.Decimal(18, 2), price_max);
+    }
+    if (area_min) {
+      query += ` AND p.area >= @area_min`;
+      request.input('area_min', sql.Decimal(18, 2), area_min);
+    }
+    if (area_max) {
+      query += ` AND p.area <= @area_max`;
+      request.input('area_max', sql.Decimal(18, 2), area_max);
     }
     if (bedrooms) {
-      query += " AND bedrooms = @bedrooms";
-      inputs.push({ name: "bedrooms", type: sql.Int, value: bedrooms });
+      query += ` AND p.bedrooms = @bedrooms`;
+      request.input('bedrooms', sql.Int, bedrooms);
     }
     if (bathrooms) {
-      query += " AND bathrooms = @bathrooms";
-      inputs.push({ name: "bathrooms", type: sql.Int, value: bathrooms });
+      query += ` AND p.bathrooms = @bathrooms`;
+      request.input('bathrooms', sql.Int, bathrooms);
     }
-
-    const request = pool.request();
-    inputs.forEach(input => request.input(input.name, input.type, input.value));
+    if (property_type) {
+      query += ` AND p.property_type = @property_type`;
+      request.input('property_type', sql.NVarChar, property_type);
+    }
+    if (amenities) {
+      query += ` AND p.amenities LIKE @amenities`;
+      request.input('amenities', sql.NVarChar, `%${amenities}%`);
+    }
 
     const result = await request.query(query);
     res.status(200).json(result.recordset);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error searching properties:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -149,5 +182,5 @@ module.exports = {
   addProperty: [authenticateToken, addProperty],
   updateProperty: [authenticateToken, updateProperty],
   deleteProperty: [authenticateToken, deleteProperty],
-  searchProperties,
+  searchProperties, // Đảm bảo hàm này được export
 };
