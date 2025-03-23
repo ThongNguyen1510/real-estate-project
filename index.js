@@ -40,6 +40,8 @@ sql.connect(dbConfig, err => {
 
 // Routes
 app.use('/api', routes);
+const propertyRoutes = require("./routes/propertiesRoutes");
+app.use("/api/properties", propertyRoutes); // Ensure this route is connected
 
 // API đăng ký
 app.post('/api/auth/register', async (req, res) => {
