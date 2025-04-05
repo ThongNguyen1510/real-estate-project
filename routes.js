@@ -1,17 +1,17 @@
 const express = require("express");
-const { registerUser, loginUser } = require("./controllers/userController");
-const propertyController = require("./controllers/propertyController");
+const userRoutes = require("./routes/userRoutes");
+const propertyRoutes = require("./routes/propertiesRoutes");
+const imageRoutes = require("./routes/imageRoutes");
 
 const router = express.Router();
 
-// Authentication routes
-router.post("/auth/register", registerUser);
-router.post("/auth/login", loginUser);
+// User routes
+router.use("/auth", userRoutes);
 
 // Property routes
-router.get("/properties", propertyController.getProperties);
-router.post("/properties", propertyController.addProperty);
-router.put("/properties/:id", propertyController.updateProperty);
-router.delete("/properties/:id", propertyController.deleteProperty);
+router.use("/properties", propertyRoutes);
+
+// Image routes
+router.use("/images", imageRoutes);
 
 module.exports = router;

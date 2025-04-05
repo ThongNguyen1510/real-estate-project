@@ -7,41 +7,36 @@ const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
+const app = require('./app');
 
 dotenv.config(); // Tải các biến môi trường từ tệp .env
 
-const app = express();
 const PORT = process.env.PORT || 9000;
 
 app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json());
 
-// Cấu hình kết nối cơ sở dữ liệu
-const dbConfig = {
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    server: process.env.DB_SERVER,
-    database: 'RealEstateDB',
-    options: {
-        encrypt: true, // Sử dụng mã hóa
-        trustServerCertificate: true // Bỏ qua kiểm tra chứng chỉ tự ký
-    }
-};
-
-// Kết nối cơ sở dữ liệu
-sql.connect(dbConfig, err => {
-    if (err) {
-        console.error('Database connection failed:', err);
-    } else {
-        console.log('Connected to database');
-    }
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log('\n=== Incoming Request ===');
+  console.log('Time:', new Date().toISOString());
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  console.log('Query:', req.query);
+  console.log('Body:', req.body);
+  console.log('======================\n');
+  next();
 });
 
 // Routes
-app.use('/api', routes);
 const propertyRoutes = require("./routes/propertiesRoutes");
-app.use("/api/properties", propertyRoutes); // Ensure this route is connected
+const reviewRoutes = require("./routes/reviewRoutes");
+const imageRoutes = require("./routes/imageRoutes");
+
+app.use('/api', propertyRoutes);
+app.use('/api', reviewRoutes);
+app.use('/api/images', imageRoutes);
 
 // API đăng ký
 app.post('/api/auth/register', async (req, res) => {
@@ -51,7 +46,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
   try {
     const request = new sql.Request();
-    const hashedPassword = await bcrypt.hash(password, 10); // Mã hóa mật khẩu
+    const hashedPassword = await bcrypt.hash(password, 10);
     request.input('username', sql.NVarChar, username);
     request.input('name', sql.NVarChar, name);
     request.input('email', sql.NVarChar, email);
@@ -97,12 +92,46 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// Log registered routes
+console.log('\n=== Registered Routes ===');
+app._router.stack.forEach(function(middleware){
+    if(middleware.route){ // routes registered directly on the app
+        console.log(`${Object.keys(middleware.route.methods).join(',')} ${middleware.route.path}`);
+    } else if(middleware.name === 'router'){ // router middleware 
+        middleware.handle.stack.forEach(function(handler){
+            if(handler.route){
+                const methods = Object.keys(handler.route.methods);
+                const path = handler.route.path;
+                console.log(`${methods.join(',')} ${path}`);
+            }
+        });
+    }
+});
+console.log('======================\n');
+
 // Error handling
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('\n=== Error ===');
+  console.error('Time:', new Date().toISOString());
+  console.error('URL:', req.url);
+  console.error('Error:', err.stack);
+  console.error('======================\n');
   res.status(500).json({ 
     status: 'error',
     message: 'Something went wrong!'
+  });
+});
+
+// Handle 404 - Route not found
+app.use((req, res) => {
+  console.log('\n=== 404 Not Found ===');
+  console.log('Time:', new Date().toISOString());
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  console.log('======================\n');
+  res.status(404).json({
+    success: false,
+    message: 'Không tìm thấy route này'
   });
 });
 
@@ -110,11 +139,13 @@ app.use((err, req, res, next) => {
 const startServer = async () => {
   try {
     await connectToDatabase();
+    console.log('✅ Kết nối cơ sở dữ liệu thành công!');
+    
     app.listen(PORT, () => {
       console.log(`🚀 Server đang chạy trên cổng ${PORT}`);
     });
   } catch (error) {
-    console.error('Database connection failed:', error);
+    console.error('❌ Lỗi kết nối database:', error);
     process.exit(1);
   }
 };

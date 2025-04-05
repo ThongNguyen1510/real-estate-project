@@ -1,19 +1,33 @@
-const express = require("express");
+const express = require('express');
+const router = express.Router();
 const {
+  authenticateToken,
   getProperties,
+  getPropertyById,
   addProperty,
   updateProperty,
   deleteProperty,
-  searchProperties // Đảm bảo tên này khớp với tên export
-} = require("../controllers/propertyController");
+  searchProperties,
+  addToFavorites,
+  removeFromFavorites,
+  getFavoriteProperties
+} = require('../controllers/propertyController');
 
-const router = express.Router();
+// Public routes
+router.get('/', getProperties);
+router.get('/search', searchProperties);
 
-// Define real estate API routes
-router.get("/", getProperties);
-router.post("/", addProperty);
-router.put("/:id", updateProperty);
-router.delete("/:id", deleteProperty);
-router.get("/search", searchProperties); // Đảm bảo hàm này được sử dụng đúng
+// Favorite routes (đặt trước route /:id)
+router.get('/favorites', authenticateToken, getFavoriteProperties);
+router.post('/favorites/:id', authenticateToken, addToFavorites);
+router.delete('/favorites/:id', authenticateToken, removeFromFavorites);
+
+// Property detail route
+router.get('/:id', getPropertyById);
+
+// Protected routes
+router.post('/', authenticateToken, addProperty);
+router.put('/:id', authenticateToken, updateProperty);
+router.delete('/:id', authenticateToken, deleteProperty);
 
 module.exports = router;
