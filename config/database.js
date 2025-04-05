@@ -1,24 +1,30 @@
+require('dotenv').config();
 const sql = require('mssql');
 
 const config = {
-    user: 'sa', // Replace with your SQL Server username
-    password: 'Thong15102004', // Replace with your SQL Server password
-    server: 'localhost', // Replace with your SQL Server host
-    database: 'RealEstateDB', // Replace with your database name
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    server: process.env.DB_SERVER,
+    database: process.env.DB_NAME,
     options: {
         encrypt: false, // Set to true if using Azure or encrypted connections
         trustServerCertificate: true // Required for self-signed certificates
     }
 };
 
-let poolConnection;
+let poolConnection; // Khởi tạo poolConnection                  
 
 const connectToDatabase = async () => {
-    if (!poolConnection) {
-        poolConnection = await sql.connect(config);
-        console.log('✅ Kết nối cơ sở dữ liệu thành công!');
+    try {
+        if (!poolConnection) {
+            poolConnection = await sql.connect(config);
+            console.log('✅ Kết nối cơ sở dữ liệu thành công!');
+        }
+        return poolConnection;
+    } catch (error) {
+        console.error('❌ Lỗi kết nối cơ sở dữ liệu:', error);
+        throw error;
     }
-    return poolConnection;
 };
 
 module.exports = {
