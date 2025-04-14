@@ -1,15 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateToken } = require('../controllers/propertyController');
+const { auth } = require('../middleware/auth');
 const {
-  addReview,
   getPropertyReviews,
+  addReview,
   deleteReview
 } = require('../controllers/reviewController');
 
-// Reviews routes
+// Lấy đánh giá của một bất động sản
 router.get('/property/:propertyId/reviews', getPropertyReviews);
-router.post('/property/:propertyId/reviews', authenticateToken, addReview);
-router.delete('/property/reviews/:reviewId', authenticateToken, deleteReview);
+
+// Thêm đánh giá mới (yêu cầu đăng nhập)
+router.post('/property/:propertyId/reviews', auth, addReview);
+
+// Xóa đánh giá (yêu cầu đăng nhập)
+router.delete('/property/reviews/:reviewId', auth, deleteReview);
 
 module.exports = router; 

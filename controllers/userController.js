@@ -209,47 +209,60 @@ const updateUserProfile = async (req, res) => {
 
 // Đổi mật khẩu
 const changePassword = async (req, res) => {
-    const { currentPassword, newPassword } = req.body;
-    const userId = req.user.id;
-    
     try {
+        const { current_password, new_password } = req.body;
+        
+        // Kiểm tra các trường bắt buộc
+        if (!current_password || !new_password) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Vui lòng nhập đầy đủ mật khẩu hiện tại và mật khẩu mới' 
+            });
+        }
+
         // Lấy thông tin user
         const result = await sql.query`
-            SELECT password FROM Users WHERE id = ${userId}
+            SELECT id, password 
+            FROM Users 
+            WHERE id = ${req.user.id}
         `;
-        
+
         const user = result.recordset[0];
-        
+        if (!user) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Người dùng không tồn tại' 
+            });
+        }
+
         // Kiểm tra mật khẩu hiện tại
-        const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
-        if (!isPasswordValid) {
-            return res.status(400).json({
-                success: false,
-                message: 'Mật khẩu hiện tại không đúng'
+        const isMatch = await bcrypt.compare(current_password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Mật khẩu hiện tại không đúng' 
             });
         }
 
         // Mã hóa mật khẩu mới
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        const hashedPassword = await bcrypt.hash(new_password, 10);
         
-        // Cập nhật mật khẩu
+        // Cập nhật mật khẩu (bỏ updated_at)
         await sql.query`
             UPDATE Users 
-            SET password = ${hashedPassword},
-                updated_at = GETDATE()
-            WHERE id = ${userId}
+            SET password = ${hashedPassword}
+            WHERE id = ${req.user.id}
         `;
-
-        res.status(200).json({
-            success: true,
-            message: 'Đổi mật khẩu thành công'
+        
+        res.json({ 
+            success: true, 
+            message: 'Đổi mật khẩu thành công' 
         });
     } catch (error) {
         console.error('Lỗi đổi mật khẩu:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi server',
-            error: error.message
+        res.status(500).json({ 
+            success: false, 
+            message: 'Lỗi server' 
         });
     }
 };
@@ -455,14 +468,14 @@ const getUserProperties = async (req, res) => {
     }
 };
 
-// Lấy danh sách yêu thích của người dùng
+// Lấy danh sách yêu thích
 const getUserFavorites = async (req, res) => {
     try {
         const favorites = await sql.query`
             SELECT p.*, 
-                   (SELECT TOP 1 url FROM PropertyImages WHERE property_id = p.id) as thumbnail
+                   (SELECT TOP 1 image_url FROM PropertyImages WHERE property_id = p.id) as thumbnail
             FROM Properties p
-            INNER JOIN UserFavorites f ON p.id = f.property_id
+            INNER JOIN Favorites f ON p.id = f.property_id
             WHERE f.user_id = ${req.user.id}
             ORDER BY f.created_at DESC
         `;
@@ -670,6 +683,75 @@ const deleteAccount = async (req, res) => {
     }
 };
 
+// Thêm vào danh sách yêu thích
+const addToFavorites = async (req, res) => {
+    try {
+        const propertyId = req.params.propertyId;
+        const userId = req.user.id;
+
+        // Kiểm tra xem đã thêm vào yêu thích chưa
+        const existing = await sql.query`
+            SELECT id FROM Favorites 
+            WHERE user_id = ${userId} AND property_id = ${propertyId}
+        `;
+
+        if (existing.recordset.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Bất động sản này đã có trong danh sách yêu thích'
+            });
+        }
+
+        // Thêm vào yêu thích
+        await sql.query`
+            INSERT INTO Favorites (user_id, property_id, created_at)
+            VALUES (${userId}, ${propertyId}, GETDATE())
+        `;
+
+        res.json({
+            success: true,
+            message: 'Đã thêm vào danh sách yêu thích'
+        });
+    } catch (error) {
+        console.error('Lỗi add to favorites:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server'
+        });
+    }
+};
+
+// Xóa khỏi danh sách yêu thích
+const removeFromFavorites = async (req, res) => {
+    try {
+        const propertyId = req.params.propertyId;
+        const userId = req.user.id;
+
+        const result = await sql.query`
+            DELETE FROM Favorites
+            WHERE user_id = ${userId} AND property_id = ${propertyId}
+        `;
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy bất động sản này trong danh sách yêu thích'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Đã xóa khỏi danh sách yêu thích'
+        });
+    } catch (error) {
+        console.error('Lỗi remove from favorites:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server'
+        });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
@@ -690,5 +772,7 @@ module.exports = {
     deleteNotification,
     getNotificationSettings,
     updateNotificationSettings,
-    deleteAccount
+    deleteAccount,
+    addToFavorites,
+    removeFromFavorites
 };

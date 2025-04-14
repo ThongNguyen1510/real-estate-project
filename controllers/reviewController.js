@@ -1,4 +1,4 @@
-const sql = require('mssql');
+const { sql } = require('../config/database');
 
 // Thêm đánh giá cho bất động sản
 async function addReview(req, res) {
@@ -21,32 +21,13 @@ async function addReview(req, res) {
       });
     }
 
-    const request = new sql.Request();
-    request.input('propertyId', sql.Int, propertyId);
-    request.input('userId', sql.Int, userId);
-    request.input('rating', sql.Int, rating);
-    request.input('comment', sql.NVarChar, comment);
-
-    // Kiểm tra bất động sản tồn tại
-    const propertyCheck = await request.query`
-      SELECT id FROM Properties WHERE id = @propertyId
+    // Kiểm tra xem user đã đánh giá bất động sản này chưa
+    const existingReview = await sql.query`
+      SELECT id FROM Reviews
+      WHERE user_id = ${userId} AND property_id = ${propertyId}
     `;
 
-    if (propertyCheck.recordset.length === 0) {
-      console.log('Property not found:', propertyId);
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy bất động sản'
-      });
-    }
-
-    // Kiểm tra user đã đánh giá chưa
-    const reviewCheck = await request.query`
-      SELECT id FROM Reviews 
-      WHERE property_id = @propertyId AND user_id = @userId
-    `;
-
-    if (reviewCheck.recordset.length > 0) {
+    if (existingReview.recordset.length > 0) {
       console.log('User already reviewed this property');
       return res.status(400).json({
         success: false,
@@ -55,18 +36,19 @@ async function addReview(req, res) {
     }
 
     // Thêm đánh giá
-    const result = await request.query`
-      INSERT INTO Reviews (property_id, user_id, rating, comment)
-      VALUES (@propertyId, @userId, @rating, @comment);
+    const result = await sql.query`
+      INSERT INTO Reviews (user_id, property_id, rating, comment, created_at)
+      VALUES (${userId}, ${propertyId}, ${rating}, ${comment}, GETDATE());
       
       SELECT SCOPE_IDENTITY() as id
     `;
 
+   
     const reviewId = result.recordset[0].id;
     console.log('Created review with ID:', reviewId);
 
     // Lấy thông tin đánh giá vừa thêm
-    const review = await request.query`
+    const review = await sql.query`
       SELECT 
         r.id,
         r.property_id,
@@ -179,51 +161,12 @@ async function getPropertyReviews(req, res) {
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    const request = new sql.Request();
-    request.input('propertyId', sql.Int, propertyId);
-    request.input('offset', sql.Int, offset);
-    request.input('limit', sql.Int, limit);
-
-    // Kiểm tra bất động sản tồn tại
-    const propertyCheck = await request.query`
-      SELECT id FROM Properties WHERE id = @propertyId
-    `;
-
-    if (propertyCheck.recordset.length === 0) {
-      console.log('Property not found:', propertyId);
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy bất động sản'
-      });
-    }
-
-    // Lấy tổng số đánh giá
-    const countResult = await request.query`
-      SELECT COUNT(*) as total
-      FROM Reviews
-      WHERE property_id = @propertyId
-    `;
-    
-    const total = countResult.recordset[0].total;
-    const totalPages = Math.ceil(total / limit);
-
-    // Lấy danh sách đánh giá
-    const reviews = await request.query`
-      SELECT 
-        r.id,
-        r.property_id,
-        r.user_id,
-        r.rating,
-        r.comment,
-        r.created_at,
-        u.name as user_name,
-        u.avatar_url
+    const reviews = await sql.query`
+      SELECT r.*, u.name as user_name, u.avatar_url
       FROM Reviews r
-      JOIN Users u ON r.user_id = u.id
-      WHERE r.property_id = @propertyId
+      INNER JOIN Users u ON r.user_id = u.id
+      WHERE r.property_id = ${propertyId}
       ORDER BY r.created_at DESC
-      OFFSET @offset ROWS
-      FETCH NEXT @limit ROWS ONLY
     `;
 
     console.log('Found reviews:', reviews.recordset.length);
@@ -235,8 +178,8 @@ async function getPropertyReviews(req, res) {
       data: {
         reviews: reviews.recordset,
         pagination: {
-          total,
-          totalPages,
+          total: reviews.recordset.length,
+          totalPages: Math.ceil(reviews.recordset.length / limit),
           currentPage: page,
           limit
         }
@@ -263,17 +206,13 @@ async function deleteReview(req, res) {
     const { reviewId } = req.params;
     const userId = req.user?.id || 1; // Fallback to 1 if no user in token
 
-    const request = new sql.Request();
-    request.input('reviewId', sql.Int, reviewId);
-    request.input('userId', sql.Int, userId);
-
-    // Kiểm tra đánh giá tồn tại và thuộc về user
-    const reviewCheck = await request.query`
-      SELECT id FROM Reviews 
-      WHERE id = @reviewId AND user_id = @userId
+    // Kiểm tra quyền xóa
+    const review = await sql.query`
+      SELECT property_id FROM Reviews
+      WHERE id = ${reviewId} AND user_id = ${userId}
     `;
 
-    if (reviewCheck.recordset.length === 0) {
+    if (review.recordset.length === 0) {
       console.log('Review not found or not owned by user:', reviewId);
       return res.status(404).json({
         success: false,
@@ -282,8 +221,18 @@ async function deleteReview(req, res) {
     }
 
     // Xóa đánh giá
-    await request.query`
-      DELETE FROM Reviews WHERE id = @reviewId
+    await sql.query`DELETE FROM Reviews WHERE id = ${reviewId}`;
+
+    // Cập nhật lại rating trung bình
+    const propertyId = review.recordset[0].property_id;
+    await sql.query`
+      UPDATE Properties
+      SET avg_rating = (
+        SELECT AVG(CAST(rating AS FLOAT))
+        FROM Reviews
+        WHERE property_id = ${propertyId}
+      )
+      WHERE id = ${propertyId}
     `;
 
     console.log('Deleted review:', reviewId);

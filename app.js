@@ -1,36 +1,32 @@
 const express = require('express');
-const app = express();
 const cors = require('cors');
-const propertyRoutes = require('./routes/propertiesRoutes');
-const imageRoutes = require('./routes/imageRoutes');
-const reviewRoutes = require('./routes/reviewRoutes');
+const morgan = require('morgan');
 const userRoutes = require('./routes/userRoutes');
-const mapRoutes = require('./routes/mapRoutes');
+const propertyRoutes = require('./routes/propertiesRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const mapRoutes = require('./routes/mapRoutes');
+const imageRoutes = require('./routes/imageRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+
+const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-// Request logging middleware
-app.use((req, res, next) => {
-  console.log('\n=== Incoming Request ===');
-  console.log('Time:', new Date().toISOString());
-  console.log('Method:', req.method);
-  console.log('URL:', req.url);
-  console.log('Query:', req.query);
-  console.log('Body:', req.body);
-  console.log('======================\n');
-  next();
-});
+app.use(morgan('dev'));
 
 // Routes
-app.use('/api/auth', userRoutes);
+app.use('/api/auth', userRoutes);  // Auth routes (login, register, etc.)
+app.use('/api/users', userRoutes); // User profile routes
 app.use('/api/properties', propertyRoutes);
-app.use('/api/properties', reviewRoutes);
-app.use('/api/images', imageRoutes);
-app.use('/api/map', mapRoutes);
+app.use('/api', reviewRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/map', mapRoutes);
+app.use('/api/images', imageRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Log registered routes
 console.log('\n=== Registered Routes ===');
@@ -51,22 +47,19 @@ console.log('======================\n');
 
 // Error handling
 app.use((err, req, res, next) => {
-  console.error('\n=== Error ===');
-  console.error('Time:', new Date().toISOString());
-  console.error('URL:', req.url);
-  console.error('Error:', err.stack);
-  console.error('======================\n');
-  res.status(500).json({ message: 'Lỗi server' });
+    console.error(err.stack);
+    res.status(500).json({
+        success: false,
+        message: 'Lỗi server'
+    });
 });
 
 // 404 handler
 app.use((req, res) => {
-  console.log('\n=== 404 Not Found ===');
-  console.log('Time:', new Date().toISOString());
-  console.log('Method:', req.method);
-  console.log('URL:', req.url);
-  console.log('======================\n');
-  res.status(404).json({ message: 'Không tìm thấy route này' });
+    res.status(404).json({
+        success: false,
+        message: 'API không tồn tại'
+    });
 });
 
 module.exports = app; 
