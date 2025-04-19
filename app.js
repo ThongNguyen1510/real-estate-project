@@ -15,9 +15,8 @@ const transactionRoutes = require('./routes/transactionRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
 const agentRatingRoutes = require('./routes/agentRatingRoutes');
 const documentRoutes = require('./routes/documentRoutes');
-const paymentRoutes = require('./routes/payment');
+const paymentRoutes = require('./routes/payment.js'); // Fixed extension
 const notificationRoutes = require('./routes/notificationRoutes');
-const advancedPaymentRoutes = require('./routes/advancedPaymentRoutes');
 
 const app = express();
 
@@ -44,7 +43,6 @@ app.use('/api', agentRatingRoutes); // Agent Rating routes
 app.use('/api/documents', documentRoutes); // Tài liệu
 app.use('/api/payments', paymentRoutes); // Thanh toán
 app.use('/api/notifications', notificationRoutes); // Thông báo
-app.use('/api/advanced-payments', advancedPaymentRoutes);
 
 // Log registered routes
 console.log('\n=== Registered Routes ===');
