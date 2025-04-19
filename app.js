@@ -9,6 +9,15 @@ const mapRoutes = require('./routes/mapRoutes');
 const imageRoutes = require('./routes/imageRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const newsRoutes = require('./routes/newsRoutes');
+const locationRoutes = require('./routes/locationRoutes');
+const transactionRoutes = require('./routes/transactionRoutes');
+const appointmentRoutes = require('./routes/appointmentRoutes');
+const agentRatingRoutes = require('./routes/agentRatingRoutes');
+const documentRoutes = require('./routes/documentRoutes');
+const paymentRoutes = require('./routes/payment');
+const notificationRoutes = require('./routes/notificationRoutes');
+const advancedPaymentRoutes = require('./routes/advancedPaymentRoutes');
 
 const app = express();
 
@@ -27,6 +36,15 @@ app.use('/api/map', mapRoutes);
 app.use('/api/images', imageRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/news', newsRoutes);
+app.use('/api/locations', locationRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api', agentRatingRoutes); // Agent Rating routes
+app.use('/api/documents', documentRoutes); // Tài liệu
+app.use('/api/payments', paymentRoutes); // Thanh toán
+app.use('/api/notifications', notificationRoutes); // Thông báo
+app.use('/api/advanced-payments', advancedPaymentRoutes);
 
 // Log registered routes
 console.log('\n=== Registered Routes ===');
