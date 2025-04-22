@@ -31,11 +31,9 @@ app.use((req, res, next) => {
 
 // Routes
 const propertyRoutes = require("./routes/propertiesRoutes");
-const reviewRoutes = require("./routes/reviewRoutes");
 const imageRoutes = require("./routes/imageRoutes");
 
 app.use('/api', propertyRoutes);
-app.use('/api', reviewRoutes);
 app.use('/api/images', imageRoutes);
 
 // API đăng ký

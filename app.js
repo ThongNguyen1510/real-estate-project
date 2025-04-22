@@ -3,7 +3,6 @@ const cors = require('cors');
 const morgan = require('morgan');
 const userRoutes = require('./routes/userRoutes');
 const propertyRoutes = require('./routes/propertiesRoutes');
-const reviewRoutes = require('./routes/reviewRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const mapRoutes = require('./routes/mapRoutes');
 const imageRoutes = require('./routes/imageRoutes');
@@ -11,12 +10,10 @@ const messageRoutes = require('./routes/messageRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const newsRoutes = require('./routes/newsRoutes');
 const locationRoutes = require('./routes/locationRoutes');
-const transactionRoutes = require('./routes/transactionRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
-const agentRatingRoutes = require('./routes/agentRatingRoutes');
 const documentRoutes = require('./routes/documentRoutes');
-const paymentRoutes = require('./routes/payment.js'); // Fixed extension
 const notificationRoutes = require('./routes/notificationRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 
 const app = express();
 
@@ -29,7 +26,6 @@ app.use(morgan('dev'));
 app.use('/api/auth', userRoutes);  // Auth routes (login, register, etc.)
 app.use('/api/users', userRoutes); // User profile routes
 app.use('/api/properties', propertyRoutes);
-app.use('/api', reviewRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/map', mapRoutes);
 app.use('/api/images', imageRoutes);
@@ -37,12 +33,10 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/locations', locationRoutes);
-app.use('/api/transactions', transactionRoutes);
 app.use('/api/appointments', appointmentRoutes);
-app.use('/api', agentRatingRoutes); // Agent Rating routes
 app.use('/api/documents', documentRoutes); // Tài liệu
-app.use('/api/payments', paymentRoutes); // Thanh toán
 app.use('/api/notifications', notificationRoutes); // Thông báo
+app.use('/api', reportRoutes); // Báo cáo tin đăng
 
 // Log registered routes
 console.log('\n=== Registered Routes ===');

@@ -167,7 +167,6 @@ const updateNotificationSettings = async (req, res) => {
             marketing_notifications,
             property_updates,
             messages,
-            transaction_updates,
             system_notifications
         } = req.body;
         
@@ -179,7 +178,6 @@ const updateNotificationSettings = async (req, res) => {
             marketing_notifications: Boolean(marketing_notifications),
             property_updates: Boolean(property_updates),
             messages: Boolean(messages),
-            transaction_updates: Boolean(transaction_updates),
             system_notifications: Boolean(system_notifications)
         };
         

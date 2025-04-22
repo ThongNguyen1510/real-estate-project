@@ -194,7 +194,6 @@ const notificationModel = {
                     marketing_notifications,
                     property_updates,
                     messages,
-                    transaction_updates,
                     system_notifications
                 FROM NotificationSettings
                 WHERE user_id = ${userId}
@@ -210,7 +209,6 @@ const notificationModel = {
                     marketing_notifications: true,
                     property_updates: true,
                     messages: true,
-                    transaction_updates: true,
                     system_notifications: true
                 };
             }
@@ -234,14 +232,13 @@ const notificationModel = {
                     marketing_notifications,
                     property_updates,
                     messages,
-                    transaction_updates,
                     system_notifications,
                     created_at,
                     updated_at
                 )
                 VALUES (
                     ${userId},
-                    1, 1, 0, 1, 1, 1, 1, 1,
+                    1, 1, 0, 1, 1, 1, 1,
                     GETDATE(), GETDATE()
                 )
             `;
@@ -274,7 +271,6 @@ const notificationModel = {
                         marketing_notifications,
                         property_updates,
                         messages,
-                        transaction_updates,
                         system_notifications,
                         created_at,
                         updated_at
@@ -287,7 +283,6 @@ const notificationModel = {
                         ${settings.marketing_notifications ? 1 : 0},
                         ${settings.property_updates ? 1 : 0},
                         ${settings.messages ? 1 : 0},
-                        ${settings.transaction_updates ? 1 : 0},
                         ${settings.system_notifications ? 1 : 0},
                         GETDATE(), GETDATE()
                     )
@@ -303,7 +298,6 @@ const notificationModel = {
                         marketing_notifications = ${settings.marketing_notifications ? 1 : 0},
                         property_updates = ${settings.property_updates ? 1 : 0},
                         messages = ${settings.messages ? 1 : 0},
-                        transaction_updates = ${settings.transaction_updates ? 1 : 0},
                         system_notifications = ${settings.system_notifications ? 1 : 0},
                         updated_at = GETDATE()
                     WHERE user_id = ${userId}

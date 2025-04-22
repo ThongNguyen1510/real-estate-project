@@ -140,12 +140,13 @@ const getReports = async (page = 1, limit = 10, status = '') => {
             .query(`
                 SELECT r.*, 
                        u1.name as reporter_name, u1.email as reporter_email,
+                       p.owner_id as reported_id,
                        u2.name as reported_name, u2.email as reported_email,
                        p.title as property_title
-                FROM Reports r
-                INNER JOIN Users u1 ON r.reporter_id = u1.id
-                INNER JOIN Users u2 ON r.reported_id = u2.id
-                LEFT JOIN Properties p ON r.property_id = p.id
+                FROM PropertyReports r
+                INNER JOIN Users u1 ON r.user_id = u1.id
+                INNER JOIN Properties p ON r.property_id = p.id
+                INNER JOIN Users u2 ON p.owner_id = u2.id
                 WHERE (@status = '' OR r.status = @status)
                 ORDER BY r.created_at DESC
                 OFFSET @offset ROWS
@@ -156,7 +157,7 @@ const getReports = async (page = 1, limit = 10, status = '') => {
             .input('status', sql.VarChar(50), status)
             .query(`
                 SELECT COUNT(*) as total
-                FROM Reports
+                FROM PropertyReports
                 WHERE (@status = '' OR status = @status)
             `);
 
@@ -173,16 +174,18 @@ const getReports = async (page = 1, limit = 10, status = '') => {
 };
 
 // Cập nhật trạng thái báo cáo
-const updateReportStatus = async (reportId, status) => {
+const updateReportStatus = async (reportId, status, adminResponse = null) => {
     try {
         const pool = await connectToDatabase();
         const result = await pool.request()
             .input('reportId', sql.Int, reportId)
             .input('status', sql.VarChar(50), status)
+            .input('adminResponse', sql.NVarChar, adminResponse)
             .query(`
-                UPDATE Reports
+                UPDATE PropertyReports
                 SET status = @status,
-                    updated_at = GETDATE()
+                    admin_response = @adminResponse,
+                    resolved_at = CASE WHEN @status IN ('resolved', 'rejected') THEN GETDATE() ELSE resolved_at END
                 WHERE id = @reportId
             `);
             
@@ -207,7 +210,7 @@ const getStatistics = async () => {
                 (SELECT COUNT(*) FROM Properties WHERE status = 'sold') as sold_properties,
                 (SELECT COUNT(*) FROM Reviews) as total_reviews,
                 (SELECT COUNT(*) FROM Messages) as total_messages,
-                (SELECT COUNT(*) FROM Reports WHERE status = 'pending') as pending_reports
+                (SELECT COUNT(*) FROM PropertyReports WHERE status = 'pending') as pending_reports
         `);
 
         return stats.recordset[0];

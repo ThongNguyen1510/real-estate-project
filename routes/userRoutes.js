@@ -30,6 +30,8 @@ router.get("/settings", auth, userController.getUserSettings);
 router.put("/settings", auth, userController.updateUserSettings);
 
 // Notifications (authentication required)
+// Các route dưới đây được giữ lại để tương thích với mã cũ.
+// Nên dùng API /api/notifications thay thế khi có thể
 router.get("/notifications", auth, userController.getUserNotifications);
 router.put("/notifications/read", auth, userController.markNotificationsAsRead);
 router.delete("/notifications/:id", auth, userController.deleteNotification);

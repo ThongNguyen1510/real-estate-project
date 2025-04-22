@@ -2,10 +2,10 @@
 CREATE TABLE Notifications (
     id INT IDENTITY(1,1) PRIMARY KEY,
     user_id INT NOT NULL,
-    type NVARCHAR(50) NOT NULL,  -- system, property, message, transaction, etc.
+    type NVARCHAR(50) NOT NULL,  -- system, property, message, review, etc.
     title NVARCHAR(255) NOT NULL,
     content NVARCHAR(MAX) NOT NULL,
-    related_entity_type NVARCHAR(50),  -- property, message, transaction, review, etc.
+    related_entity_type NVARCHAR(50),  -- property, message, review, etc.
     related_entity_id INT,  -- ID của đối tượng liên quan
     is_read BIT DEFAULT 0,  -- 0: unread, 1: read
     created_at DATETIME DEFAULT GETDATE(),
@@ -14,7 +14,7 @@ CREATE TABLE Notifications (
     CONSTRAINT FK_Notifications_User FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
     
     -- Ràng buộc kiểm tra
-    CONSTRAINT CHK_Notifications_Type CHECK (type IN ('system', 'property', 'message', 'transaction', 'review', 'other'))
+    CONSTRAINT CHK_Notifications_Type CHECK (type IN ('system', 'property', 'message', 'review', 'other'))
 );
 GO
 
@@ -28,7 +28,6 @@ CREATE TABLE NotificationSettings (
     marketing_notifications BIT DEFAULT 1, -- Bật/tắt thông báo marketing
     property_updates BIT DEFAULT 1,     -- Bật/tắt thông báo về bất động sản đang theo dõi
     messages BIT DEFAULT 1,             -- Bật/tắt thông báo tin nhắn mới
-    transaction_updates BIT DEFAULT 1,  -- Bật/tắt thông báo về giao dịch
     system_notifications BIT DEFAULT 1, -- Bật/tắt thông báo hệ thống
     created_at DATETIME DEFAULT GETDATE(),
     updated_at DATETIME,
@@ -69,8 +68,7 @@ INSERT INTO Notifications (user_id, type, title, content, related_entity_type, r
 VALUES
     (1, 'system', N'Chào mừng bạn đến với hệ thống', N'Cảm ơn bạn đã tham gia hệ thống bất động sản của chúng tôi.', NULL, NULL, 0),
     (1, 'property', N'Cập nhật giá bất động sản', N'Bất động sản bạn đang theo dõi đã được cập nhật giá mới.', 'property', 1, 0),
-    (1, 'message', N'Bạn có tin nhắn mới', N'Người dùng Nguyễn Văn A đã gửi cho bạn tin nhắn mới.', 'message', 1, 0),
-    (1, 'transaction', N'Giao dịch đã được cập nhật', N'Trạng thái giao dịch mua bán căn hộ đã được cập nhật sang "Đang xử lý".', 'transaction', 1, 0);
+    (1, 'message', N'Bạn có tin nhắn mới', N'Người dùng Nguyễn Văn A đã gửi cho bạn tin nhắn mới.', 'message', 1, 0);
 GO
 
 -- Mẫu dữ liệu cài đặt thông báo mặc định

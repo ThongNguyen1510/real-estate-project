@@ -201,6 +201,204 @@ async function addProperty(req, res) {
   }
 }
 
+// API Đăng Tin bất động sản mới với validation và xử lý ảnh
+async function createProperty(req, res) {
+  const { 
+    title, description, price, area, property_type, bedrooms, 
+    bathrooms, parking_slots, amenities, location, images, 
+    listing_type, status, contact_info 
+  } = req.body;
+  
+  try {
+    // Validate dữ liệu đầu vào
+    if (!title || !description || !price || !area || !property_type || !location) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng điền đầy đủ thông tin bắt buộc',
+        required_fields: ['title', 'description', 'price', 'area', 'property_type', 'location']
+      });
+    }
+
+    // Kiểm tra giá trị hợp lệ
+    if (price <= 0 || area <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Giá và diện tích phải lớn hơn 0'
+      });
+    }
+
+    // Xác thực người dùng
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Không tìm thấy thông tin người dùng'
+      });
+    }
+
+    const userId = req.user.id;
+
+    // Kiểm tra quyền đăng tin
+    const userResult = await sql.query`
+      SELECT role, account_status, verified FROM Users WHERE id = ${userId}
+    `;
+
+    if (userResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy thông tin người dùng'
+      });
+    }
+
+    const user = userResult.recordset[0];
+    
+    // Kiểm tra tài khoản có bị khóa không
+    if (user.account_status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: 'Tài khoản của bạn đã bị khóa, không thể đăng tin'
+      });
+    }
+
+    // Kiểm tra xác thực nếu hệ thống yêu cầu
+    if (user.role === 'user' && !user.verified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vui lòng xác thực tài khoản trước khi đăng tin'
+      });
+    }
+
+    // Tạo request để dùng transaction
+    const transaction = new sql.Transaction();
+    await transaction.begin();
+    const request = new sql.Request(transaction);
+
+    try {
+      // Thêm địa điểm với validation
+      if (!location.city || !location.district || !location.address) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'Thông tin địa chỉ không đầy đủ',
+          required_location_fields: ['city', 'district', 'address']
+        });
+      }
+
+      // Thêm địa điểm
+      request.input('address', sql.NVarChar, location.address);
+      request.input('city', sql.NVarChar, location.city);
+      request.input('district', sql.NVarChar, location.district);
+      request.input('ward', sql.NVarChar, location.ward || null);
+      request.input('street', sql.NVarChar, location.street || null);
+      request.input('latitude', sql.Float, location.latitude || null);
+      request.input('longitude', sql.Float, location.longitude || null);
+
+      const locationQuery = `
+        INSERT INTO Locations (address, city, district, ward, street, latitude, longitude)
+        VALUES (@address, @city, @district, @ward, @street, @latitude, @longitude)
+        SELECT SCOPE_IDENTITY() AS id
+      `;
+
+      const locationResult = await request.query(locationQuery);
+      const locationId = locationResult.recordset[0].id;
+
+      // Thêm bất động sản với các trường mới
+      request.input('title', sql.NVarChar, title);
+      request.input('description', sql.NVarChar, description);
+      request.input('price', sql.Decimal(18,2), price);
+      request.input('area', sql.Float, area);
+      request.input('property_type', sql.NVarChar, property_type);
+      request.input('bedrooms', sql.Int, bedrooms || null);
+      request.input('bathrooms', sql.Int, bathrooms || null);
+      request.input('parking_slots', sql.Int, parking_slots || null);
+      request.input('amenities', sql.NVarChar, amenities || null);
+      request.input('owner_id', sql.Int, userId);
+      request.input('location_id', sql.Int, locationId);
+      request.input('listing_type', sql.NVarChar, listing_type || 'sale'); // sale hoặc rent
+      request.input('status', sql.NVarChar, status || 'pending'); // pending, active, rejected, expired
+      request.input('contact_info', sql.NVarChar, contact_info || null);
+
+      const propertyQuery = `
+        INSERT INTO Properties (
+          title, description, price, area, property_type, bedrooms,
+          bathrooms, parking_slots, amenities, owner_id, location_id,
+          listing_type, status, contact_info, created_at, updated_at
+        )
+        VALUES (
+          @title, @description, @price, @area, @property_type,
+          @bedrooms, @bathrooms, @parking_slots, @amenities,
+          @owner_id, @location_id, @listing_type, @status, @contact_info,
+          GETDATE(), GETDATE()
+        )
+        SELECT SCOPE_IDENTITY() AS id
+      `;
+
+      const propertyResult = await request.query(propertyQuery);
+      const propertyId = propertyResult.recordset[0].id;
+
+      // Xử lý hình ảnh
+      if (images && images.length > 0) {
+        // Thêm ảnh
+        const imageValues = [];
+        const imageParams = [];
+
+        for (let i = 0; i < images.length; i++) {
+          const paramPrefix = `img${i}`;
+          request.input(`${paramPrefix}_property_id`, sql.Int, propertyId);
+          request.input(`${paramPrefix}_url`, sql.NVarChar, images[i]);
+          request.input(`${paramPrefix}_is_primary`, sql.Bit, i === 0 ? 1 : 0);
+          
+          imageValues.push(`(@${paramPrefix}_property_id, @${paramPrefix}_url, @${paramPrefix}_is_primary, GETDATE())`);
+        }
+
+        const imageQuery = `
+          INSERT INTO PropertyImages (property_id, image_url, is_primary, upload_date)
+          VALUES ${imageValues.join(', ')}
+        `;
+
+        await request.query(imageQuery);
+      }
+
+      // Tạo thông báo cho admin nếu cần duyệt
+      if (status === 'pending') {
+        request.input('admin_notification_type', sql.NVarChar, 'new_property');
+        request.input('admin_notification_message', sql.NVarChar, `Có bất động sản mới cần duyệt: ${title}`);
+        request.input('admin_notification_property_id', sql.Int, propertyId);
+
+        const notificationQuery = `
+          INSERT INTO AdminNotifications (type, message, property_id, created_at, read)
+          VALUES (@admin_notification_type, @admin_notification_message, @admin_notification_property_id, GETDATE(), 0)
+        `;
+
+        await request.query(notificationQuery);
+      }
+
+      await transaction.commit();
+
+      // Trả về response thành công
+      res.status(201).json({
+        success: true,
+        message: 'Đăng tin bất động sản thành công',
+        data: { 
+          id: propertyId,
+          status: status || 'pending',
+          created_at: new Date().toISOString() 
+        }
+      });
+    } catch (error) {
+      // Rollback transaction nếu có lỗi
+      await transaction.rollback();
+      throw error;
+    }
+  } catch (error) {
+    console.error('Lỗi đăng tin bất động sản:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi đăng tin bất động sản',
+      error: error.message
+    });
+  }
+}
+
 // Update a property
 async function updateProperty(req, res) {
   const { id } = req.params;
@@ -591,45 +789,6 @@ const getPropertyById = async (req, res) => {
   }
 }
 
-// Add review for a property
-async function addReview(req, res) {
-  try {
-    const { id } = req.params;
-    const { rating, comment } = req.body;
-    const userId = req.user.id;
-
-    // Check if property exists
-    const propertyCheck = await sql.query`
-      SELECT id FROM Properties WHERE id = ${id}
-    `;
-
-    if (propertyCheck.recordset.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy bất động sản'
-      });
-    }
-
-    // Add review
-    await sql.query`
-      INSERT INTO Reviews (property_id, user_id, rating, comment)
-      VALUES (${id}, ${userId}, ${rating}, ${comment})
-    `;
-
-    res.status(201).json({
-      success: true,
-      message: 'Thêm đánh giá thành công'
-    });
-  } catch (error) {
-    console.error('Lỗi khi thêm đánh giá:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi server',
-      error: error.message
-    });
-  }
-}
-
 // Add property to favorites
 async function addToFavorites(req, res) {
   try {
@@ -812,8 +971,8 @@ module.exports = {
   updateProperty,
   deleteProperty,
   searchProperties,
-  addReview,
   addToFavorites,
   removeFromFavorites,
-  getFavoriteProperties
+  getFavoriteProperties,
+  createProperty
 };

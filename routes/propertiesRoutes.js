@@ -10,7 +10,8 @@ const {
   searchProperties,
   addToFavorites,
   removeFromFavorites,
-  getFavoriteProperties
+  getFavoriteProperties,
+  createProperty
 } = require('../controllers/propertyController');
 
 // Public routes
@@ -27,6 +28,7 @@ router.get('/:id', getPropertyById);
 
 // Protected routes
 router.post('/', authenticateToken, addProperty);
+router.post('/create', authenticateToken, createProperty);
 router.put('/:id', authenticateToken, updateProperty);
 router.delete('/:id', authenticateToken, deleteProperty);
 

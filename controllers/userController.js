@@ -554,118 +554,37 @@ const updateUserSettings = async (req, res) => {
 
 // Lấy thông báo của người dùng
 const getUserNotifications = async (req, res) => {
-    try {
-        const notifications = await sql.query`
-            SELECT *
-            FROM UserNotifications
-            WHERE user_id = ${req.user.id}
-            ORDER BY created_at DESC
-        `;
-
-        res.json({
-            success: true,
-            data: notifications.recordset
-        });
-    } catch (error) {
-        console.error('Lỗi get user notifications:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi server'
-        });
-    }
+    // Chuyển tiếp tới notificationController
+    const notificationController = require('./notificationController');
+    return notificationController.getUserNotifications(req, res);
 };
 
 // Đánh dấu thông báo đã đọc
 const markNotificationsAsRead = async (req, res) => {
-    try {
-        await sql.query`
-            UPDATE UserNotifications
-            SET is_read = 1
-            WHERE user_id = ${req.user.id}
-            AND is_read = 0
-        `;
-
-        res.json({
-            success: true,
-            message: 'Đã đánh dấu tất cả thông báo là đã đọc'
-        });
-    } catch (error) {
-        console.error('Lỗi mark notifications as read:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi server'
-        });
-    }
+    // Chuyển tiếp tới notificationController
+    const notificationController = require('./notificationController');
+    return notificationController.markAllAsRead(req, res);
 };
 
 // Xóa thông báo
 const deleteNotification = async (req, res) => {
-    const { id } = req.params;
-    
-    try {
-        await sql.query`
-            DELETE FROM UserNotifications
-            WHERE id = ${id}
-            AND user_id = ${req.user.id}
-        `;
-
-        res.json({
-            success: true,
-            message: 'Đã xóa thông báo'
-        });
-    } catch (error) {
-        console.error('Lỗi delete notification:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi server'
-        });
-    }
+    // Chuyển tiếp tới notificationController
+    const notificationController = require('./notificationController');
+    return notificationController.deleteNotification(req, res);
 };
 
 // Lấy cài đặt thông báo
 const getNotificationSettings = async (req, res) => {
-    try {
-        const settings = await sql.query`
-            SELECT notification_email, notification_sms, language
-            FROM UserSettings
-            WHERE user_id = ${req.user.id}
-        `;
-
-        res.json({ success: true, data: settings.recordset[0] || {
-            notification_email: true,
-            notification_sms: true,
-            language: 'vi'
-        } });
-    } catch (error) {
-        console.error('Lỗi khi lấy cài đặt thông báo:', error);
-        res.status(500).json({ success: false, message: 'Lỗi server' });
-    }
+    // Chuyển tiếp tới notificationController
+    const notificationController = require('./notificationController');
+    return notificationController.getNotificationSettings(req, res);
 };
 
 // Cập nhật cài đặt thông báo
 const updateNotificationSettings = async (req, res) => {
-    try {
-        const { notification_email, notification_sms, language } = req.body;
-        await sql.query`
-            MERGE INTO UserSettings WITH (HOLDLOCK) AS target
-            USING (VALUES (${req.user.id}, ${notification_email}, ${notification_sms}, ${language})) 
-                AS source (user_id, notification_email, notification_sms, language)
-            ON target.user_id = source.user_id
-            WHEN MATCHED THEN
-                UPDATE SET 
-                    notification_email = source.notification_email,
-                    notification_sms = source.notification_sms,
-                    language = source.language
-            WHEN NOT MATCHED THEN
-                INSERT (user_id, notification_email, notification_sms, language)
-                VALUES (source.user_id, source.notification_email, source.notification_sms, source.language);
-        `;
-
-        res.json({ success: true, message: 'Cập nhật cài đặt thông báo thành công' });
-    } catch (error) {
-        console.error('Lỗi khi cập nhật cài đặt thông báo:', error);
-        res.status(500).json({ success: false, message: 'Lỗi server' });
-    }
+    // Chuyển tiếp tới notificationController
+    const notificationController = require('./notificationController');
+    return notificationController.updateNotificationSettings(req, res);
 };
 
 // Xóa tài khoản

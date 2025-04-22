@@ -139,16 +139,16 @@ const listReports = async (req, res) => {
 const updateReport = async (req, res) => {
     try {
         const { reportId } = req.params;
-        const { status } = req.body;
+        const { status, admin_response } = req.body;
 
-        if (!status || !['pending', 'approved', 'rejected'].includes(status)) {
+        if (!status || !['pending', 'investigating', 'resolved', 'rejected'].includes(status)) {
             return res.status(400).json({
                 success: false,
                 message: 'Trạng thái không hợp lệ'
             });
         }
 
-        const updated = await updateReportStatus(reportId, status);
+        const updated = await updateReportStatus(reportId, status, admin_response);
         
         if (!updated) {
             return res.status(404).json({
