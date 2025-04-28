@@ -6,10 +6,12 @@ const routes = require('./routes');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const dotenv = require('dotenv');
 const app = require('./app');
 
-dotenv.config(); // Tải các biến môi trường từ tệp .env
+// In ra các biến môi trường để debug
+console.log('Environment Variables Check in index.js:');
+console.log(`JWT_SECRET: ${typeof process.env.JWT_SECRET !== 'undefined' ? 'Defined' : 'Undefined'}`);
+console.log(`PORT: ${process.env.PORT || 9000}`);
 
 const PORT = process.env.PORT || 9000;
 

@@ -97,13 +97,14 @@ const loginUser = async (req, res) => {
         `;
 
         // Tạo token
+        const JWT_SECRET = process.env.JWT_SECRET || 'Thong15102004';
         const token = jwt.sign(
             { 
                 id: user.id, 
                 username: user.username,
                 role: user.role 
             },
-            process.env.JWT_SECRET,
+            JWT_SECRET,
             { expiresIn: '24h' }
         );
 
