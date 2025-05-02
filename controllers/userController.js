@@ -283,7 +283,7 @@ const forgotPassword = async (req, res) => {
         // Tạo token reset password
         const resetToken = jwt.sign(
             { id: user.recordset[0].id },
-            process.env.JWT_SECRET,
+            process.env.JWT_SECRET || 'Thong15102004',
             { expiresIn: '1h' }
         );
 
@@ -295,33 +295,52 @@ const forgotPassword = async (req, res) => {
             WHERE id = ${user.recordset[0].id}
         `;
 
+        // Log token để dễ dàng debug nếu cần
+        console.log('============== RESET PASSWORD TOKEN ==============');
+        console.log(resetToken);
+        console.log('==================================================');
+
         // Gửi email reset password
         const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: process.env.SMTP_PORT,
-            secure: true,
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: parseInt(process.env.SMTP_PORT || '465'),
+            secure: process.env.SMTP_SECURE === 'true' || true,
             auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS
+                user: process.env.SMTP_USER || 'your_email@gmail.com', // Thay bằng email thật
+                pass: process.env.SMTP_PASS || 'your_app_password'  // Thay bằng app password
             }
         });
 
-        const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-        await transporter.sendMail({
-            from: process.env.SMTP_FROM,
-            to: email,
-            subject: 'Reset mật khẩu',
-            html: `
-                <h1>Reset mật khẩu</h1>
-                <p>Click vào link sau để reset mật khẩu:</p>
-                <a href="${resetUrl}">${resetUrl}</a>
-                <p>Link sẽ hết hạn sau 1 giờ.</p>
-            `
-        });
-
-        res.json({ success: true, message: 'Email reset mật khẩu đã được gửi' });
+        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+        
+        try {
+            await transporter.sendMail({
+                from: process.env.SMTP_FROM || 'your_email@gmail.com', // Thay bằng email thật
+                to: email,
+                subject: 'Reset mật khẩu',
+                html: `
+                    <h1>Reset mật khẩu</h1>
+                    <p>Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản của mình.</p>
+                    <p>Click vào link sau để reset mật khẩu:</p>
+                    <a href="${resetUrl}">${resetUrl}</a>
+                    <p>Link sẽ hết hạn sau 1 giờ.</p>
+                    <p>Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
+                `
+            });
+            
+            res.json({ success: true, message: 'Email reset mật khẩu đã được gửi' });
+        } catch (emailError) {
+            console.error('Lỗi gửi email:', emailError);
+            
+            // Vẫn trả về thành công và hiển thị token trong console
+            res.json({ 
+                success: true, 
+                message: 'Không thể gửi email, nhưng token đã được tạo. Kiểm tra logs.',
+                debug: process.env.NODE_ENV === 'development' ? resetToken : undefined
+            });
+        }
     } catch (error) {
-        console.error('Lỗi khi gửi email reset mật khẩu:', error);
+        console.error('Lỗi khi xử lý yêu cầu reset mật khẩu:', error);
         res.status(500).json({ success: false, message: 'Lỗi server' });
     }
 };
