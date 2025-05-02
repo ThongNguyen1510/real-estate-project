@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Container, Box, Typography, TextField, Button, Link, Alert } from '@mui/material';
-import { Person, Email, Lock, Phone, Home } from '@mui/icons-material';
+import { Person, Email, Lock, Phone, Home, Face } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
 const Register = () => {
@@ -9,7 +9,8 @@ const Register = () => {
     email: '',
     password: '',
     phone: '',
-    address: ''
+    address: '',
+    nickname: '' // Thêm trường nickname
   });
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -52,6 +53,18 @@ const Register = () => {
               startAdornment: <Person sx={{ mr: 1, color: 'action.active' }} />
             }}
             value={formData.name}
+            onChange={handleChange}
+          />
+          
+          <TextField
+            fullWidth
+            label="Biệt danh"
+            name="nickname"
+            margin="normal"
+            InputProps={{
+              startAdornment: <Face sx={{ mr: 1, color: 'action.active' }} />
+            }}
+            value={formData.nickname}
             onChange={handleChange}
           />
           

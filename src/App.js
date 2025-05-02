@@ -22,6 +22,7 @@ import PostManagement from './pages/PostManagement/PostManagement';
 import Favorites from './pages/Favorites/Favorites';
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
+import Profile from './pages/Profile/Profile';
 import NotFound from './pages/NotFound/NotFound';
 
 // Layout component với ChatWidget
@@ -80,12 +81,11 @@ function App() {
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
 
-                  {/* Protected Routes */}
-                  <Route path="/post-management" element={
-                    <PrivateRoute>
-                      <LayoutWithChat><PostManagement /></LayoutWithChat>
-                    </PrivateRoute>
-                  } />
+                  {/* Profile Page - Ideally should be protected, but accessible for frontend development */}
+                  <Route path="/profile" element={<LayoutWithChat><Profile /></LayoutWithChat>} />
+
+                  {/* Post Management - Now publicly accessible for frontend development */}
+                  <Route path="/post-management" element={<LayoutWithChat><PostManagement /></LayoutWithChat>} />
 
                   {/* 404 Not Found */}
                   <Route path="*" element={<NotFound />} />

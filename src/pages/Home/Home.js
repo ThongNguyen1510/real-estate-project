@@ -1,66 +1,93 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Container, Box, Typography, Grid, Button, useMediaQuery, useTheme } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import SearchBar from '../../components/SearchBar/SearchBar';
 import PropertyCard from '../../components/PropertyCard/PropertyCard';
 
-const heroImage = 'https://source.unsplash.com/random/1600x900/?real-estate';
+const heroImage = 'https://source.unsplash.com/random/1600x900/?luxury-real-estate';
 
 const Home = () => {
   const theme = useTheme();
+  const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const featuredProperties = [
     {
       id: 1,
-      title: 'Biệt thự ven hồ',
+      title: 'Biệt thự ven hồ Đông Nam',
       location: 'Quận 2, TP.HCM',
-      price: '12 tỷ',
+      price: 12000000000,
       bedrooms: 4,
       bathrooms: 3,
       area: 250,
-      type: 'Biệt thự',
+      type: 'villa',
+      direction: 'southeast',
+      purpose: 'buy',
       image: 'https://source.unsplash.com/random/600x400/?villa'
     },
     {
       id: 2,
-      title: 'Căn hộ cao cấp',
+      title: 'Căn hộ cao cấp view sông',
       location: 'Quận 1, TP.HCM',
-      price: '5.5 tỷ',
+      price: 5500000000,
       bedrooms: 3,
       bathrooms: 2,
       area: 120,
-      type: 'Căn hộ',
+      type: 'apartment',
+      direction: 'east',
+      purpose: 'buy',
       image: 'https://source.unsplash.com/random/600x400/?apartment'
     },
     {
       id: 3,
-      title: 'Nhà phố mặt tiền',
+      title: 'Nhà phố mặt tiền đường lớn',
       location: 'Quận 3, TP.HCM',
-      price: '8 tỷ',
+      price: 8000000000,
       bedrooms: 4,
       bathrooms: 3,
       area: 180,
-      type: 'Nhà phố',
+      type: 'house',
+      direction: 'west',
+      purpose: 'buy',
       image: 'https://source.unsplash.com/random/600x400/?house'
     },
     {
       id: 4,
-      title: 'Đất nền dự án',
+      title: 'Đất nền dự án khu đô thị mới',
       location: 'Quận 9, TP.HCM',
-      price: '3.2 tỷ',
+      price: 3200000000,
       bedrooms: 0,
       bathrooms: 0,
       area: 100,
-      type: 'Đất',
+      type: 'land',
+      direction: 'north',
+      purpose: 'buy',
       image: 'https://source.unsplash.com/random/600x400/?land'
     },
   ];
+
+  const handleSearch = (searchParams) => {
+    // Navigate to Properties page with search params
+    const queryParams = new URLSearchParams();
+    
+    // Add non-empty search params to URL
+    Object.keys(searchParams).forEach(key => {
+      if (searchParams[key]) {
+        queryParams.append(key, searchParams[key]);
+      }
+    });
+    
+    navigate({
+      pathname: '/properties',
+      search: queryParams.toString()
+    });
+  };
 
   return (
     <Box sx={{ overflowX: 'hidden' }}>
       {/* Hero Section */}
       <Box sx={{ 
-        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), url(${heroImage})`,
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(${heroImage})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         height: isMobile ? '65vh' : '75vh',
@@ -102,6 +129,7 @@ const Home = () => {
               borderRadius: 2,
               boxShadow: 3
             }}
+            onClick={() => navigate('/properties')}
           >
             Khám phá ngay
           </Button>
@@ -119,7 +147,7 @@ const Home = () => {
           zIndex: 2
         }}
       >
-        <SearchBar />
+        <SearchBar onSearch={handleSearch} />
       </Container>
       
       {/* Featured Properties */}
@@ -168,6 +196,7 @@ const Home = () => {
               borderRadius: 2,
               fontWeight: 'bold'
             }}
+            onClick={() => navigate('/properties')}
           >
             Xem thêm
           </Button>

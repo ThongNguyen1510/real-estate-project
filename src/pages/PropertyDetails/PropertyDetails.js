@@ -10,7 +10,9 @@ import {
   Paper,
   IconButton,
   useMediaQuery,
-  useTheme
+  useTheme,
+  Tooltip,
+  Badge
 } from '@mui/material';
 import { 
   LocationOn, 
@@ -20,12 +22,18 @@ import {
   Favorite, 
   Share, 
   Phone,
-  ArrowBack
+  ArrowBack,
+  Report,
+  Flag,
+  VerifiedUser,
+  GppMaybe
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import ImageGallery from 'react-image-gallery';
 import 'react-image-gallery/styles/css/image-gallery.css';
 import ChatWidget from '../../components/ChatWidget/ChatWidget';
+import ReportDialog from '../../components/ReportDialog';
+import VerifyDialog from '../../components/VerifyDialog';
 
 const PropertyDetails = () => {
   const { id } = useParams();
@@ -34,6 +42,8 @@ const PropertyDetails = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
 
   // Mock data - Thay bằng API call thực tế
   useEffect(() => {
@@ -62,6 +72,7 @@ const PropertyDetails = () => {
             phone: '0901234567',
             email: 'nguyenvana@example.com'
           },
+          verificationStatus: 'pending', // 'verified', 'pending', 'unverified'
           postedDate: '2023-05-15'
         };
         
@@ -75,6 +86,53 @@ const PropertyDetails = () => {
 
     fetchProperty();
   }, [id]);
+
+  const handleReportDialogOpen = () => {
+    setReportDialogOpen(true);
+  };
+
+  const handleReportDialogClose = () => {
+    setReportDialogOpen(false);
+  };
+
+  const handleVerifyDialogOpen = () => {
+    setVerifyDialogOpen(true);
+  };
+
+  const handleVerifyDialogClose = () => {
+    setVerifyDialogOpen(false);
+  };
+
+  const getVerificationBadge = () => {
+    switch(property.verificationStatus) {
+      case 'verified':
+        return (
+          <Tooltip title="Tin đăng đã được xác thực">
+            <Chip
+              icon={<VerifiedUser />}
+              label="Đã xác thực"
+              color="success"
+              size="small"
+              sx={{ ml: 1 }}
+            />
+          </Tooltip>
+        );
+      case 'pending':
+        return (
+          <Tooltip title="Tin đăng đang chờ xác thực">
+            <Chip
+              icon={<GppMaybe />}
+              label="Đang xác thực"
+              color="warning"
+              size="small"
+              sx={{ ml: 1 }}
+            />
+          </Tooltip>
+        );
+      default:
+        return null;
+    }
+  };
 
   if (loading) {
     return (
@@ -105,9 +163,36 @@ const PropertyDetails = () => {
 
         {/* Tiêu đề và giá */}
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>
-            {property.title}
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+              <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                {property.title}
+              </Typography>
+              {getVerificationBadge()}
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Tooltip title="Báo cáo tin đăng">
+                <Button 
+                  startIcon={<Flag />} 
+                  color="error" 
+                  variant="text" 
+                  size="small" 
+                  onClick={handleReportDialogOpen}
+                  sx={{ 
+                    ml: 2, 
+                    alignSelf: 'flex-start', 
+                    minWidth: 'fit-content',
+                    textTransform: 'none',
+                    '&:hover': {
+                      backgroundColor: 'rgba(211, 47, 47, 0.04)'
+                    }
+                  }}
+                >
+                  Báo cáo
+                </Button>
+              </Tooltip>
+            </Box>
+          </Box>
           <Typography variant="h5" color="primary" gutterBottom>
             {property.price}
           </Typography>
@@ -220,10 +305,52 @@ const PropertyDetails = () => {
                   Chia sẻ
                 </Button>
               </Box>
+              
+              <Divider sx={{ my: 2 }} />
+              
+              {property.verificationStatus === 'unverified' && (
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<VerifiedUser />}
+                  onClick={handleVerifyDialogOpen}
+                  sx={{ mb: 2 }}
+                >
+                  Xác thực tin đăng
+                </Button>
+              )}
+              
+              <Button
+                fullWidth
+                variant="text"
+                color="error"
+                startIcon={<Flag />}
+                onClick={handleReportDialogOpen}
+              >
+                Báo cáo tin đăng
+              </Button>
             </Paper>
           </Grid>
         </Grid>
       </Container>
+      
+      {/* Report Dialog */}
+      <ReportDialog 
+        open={reportDialogOpen}
+        onClose={handleReportDialogClose}
+        propertyTitle={property?.title}
+        propertyId={property?.id}
+      />
+      
+      {/* Verify Dialog */}
+      <VerifyDialog 
+        open={verifyDialogOpen}
+        onClose={handleVerifyDialogClose}
+        propertyTitle={property?.title}
+        propertyId={property?.id}
+      />
+      
       <ChatWidget />
     </Box>
   );
