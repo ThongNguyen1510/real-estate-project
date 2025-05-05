@@ -8,8 +8,25 @@ const {
     getLocation
 } = require('../controllers/locationController');
 
+// Disable caching for all location routes
+router.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Expires', '-1');
+    res.set('Pragma', 'no-cache');
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    next();
+});
+
 // Lấy danh sách thành phố
-router.get('/cities', listCities);
+router.get('/cities', (req, res, next) => {
+    // Thêm CORS headers cho endpoint cities
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    next();
+}, listCities);
 
 // Lấy danh sách quận/huyện theo thành phố
 router.get('/districts/:city', listDistricts);

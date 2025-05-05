@@ -34,7 +34,7 @@ const searchByMap = async (req, res) => {
         let query = `
             SELECT 
                 p.*,
-                (SELECT TOP 1 url FROM PropertyImages WHERE property_id = p.id) as thumbnail,
+                p.primary_image_url as thumbnail,
                 (6371 * acos(
                     cos(radians(${lat})) * 
                     cos(radians(CAST(p.latitude AS FLOAT))) * 
@@ -94,13 +94,9 @@ const searchByMap = async (req, res) => {
         if (amenities) {
             const amenityList = amenities.split(',');
             const amenityConditions = amenityList.map(amenity => 
-                `EXISTS (
-                    SELECT 1 FROM PropertyAmenities pa 
-                    WHERE pa.property_id = p.id 
-                    AND pa.amenity_name = '${amenity}'
-                )`
+                `p.amenities LIKE '%${amenity}%'`
             );
-            conditions.push(`(${amenityConditions.join(' AND ')})`);
+            conditions.push(`(${amenityConditions.join(' OR ')})`);
         }
 
         if (conditions.length > 0) {
@@ -119,6 +115,29 @@ const searchByMap = async (req, res) => {
         });
 
         const result = await request.query(query);
+
+        // Process result to parse images JSON if needed
+        const properties = result.recordset.map(property => {
+            let imageArray = [];
+            
+            // Parse images JSON field
+            if (property.images) {
+                try {
+                    imageArray = JSON.parse(property.images);
+                } catch (error) {
+                    console.error('Error parsing images JSON:', error);
+                }
+            }
+            
+            return {
+                ...property,
+                images: imageArray,
+                // Use thumbnail (primary_image_url) or first image from array or default
+                thumbnail: property.thumbnail || 
+                    (imageArray.length > 0 ? imageArray[0] : 
+                    'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?q=80&w=1000&auto=format&fit=crop')
+            };
+        });
 
         // Đếm tổng số kết quả
         const countQuery = `
@@ -139,7 +158,7 @@ const searchByMap = async (req, res) => {
 
         res.json({
             success: true,
-            data: result.recordset,
+            data: properties,
             pagination: {
                 total,
                 page: parseInt(page),
@@ -189,7 +208,7 @@ const searchByArea = async (req, res) => {
         let query = `
             SELECT 
                 p.*,
-                (SELECT TOP 1 url FROM PropertyImages WHERE property_id = p.id) as thumbnail
+                p.primary_image_url as thumbnail
             FROM Properties p
             WHERE p.province = @province
         `;
@@ -246,13 +265,9 @@ const searchByArea = async (req, res) => {
         if (amenities) {
             const amenityList = amenities.split(',');
             const amenityConditions = amenityList.map(amenity => 
-                `EXISTS (
-                    SELECT 1 FROM PropertyAmenities pa 
-                    WHERE pa.property_id = p.id 
-                    AND pa.amenity_name = '${amenity}'
-                )`
+                `p.amenities LIKE '%${amenity}%'`
             );
-            query += ` AND (${amenityConditions.join(' AND ')})`;
+            query += ` AND (${amenityConditions.join(' OR ')})`;
         }
 
         // Thêm sắp xếp và phân trang
@@ -267,6 +282,29 @@ const searchByArea = async (req, res) => {
         });
 
         const result = await request.query(query);
+
+        // Process result to parse images JSON if needed
+        const properties = result.recordset.map(property => {
+            let imageArray = [];
+            
+            // Parse images JSON field
+            if (property.images) {
+                try {
+                    imageArray = JSON.parse(property.images);
+                } catch (error) {
+                    console.error('Error parsing images JSON:', error);
+                }
+            }
+            
+            return {
+                ...property,
+                images: imageArray,
+                // Use thumbnail (primary_image_url) or first image from array or default
+                thumbnail: property.thumbnail || 
+                    (imageArray.length > 0 ? imageArray[0] : 
+                    'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?q=80&w=1000&auto=format&fit=crop')
+            };
+        });
 
         // Đếm tổng số kết quả
         let countQuery = `
@@ -287,13 +325,9 @@ const searchByArea = async (req, res) => {
         if (amenities) {
             const amenityList = amenities.split(',');
             const amenityConditions = amenityList.map(amenity => 
-                `EXISTS (
-                    SELECT 1 FROM PropertyAmenities pa 
-                    WHERE pa.property_id = p.id 
-                    AND pa.amenity_name = '${amenity}'
-                )`
+                `p.amenities LIKE '%${amenity}%'`
             );
-            countQuery += ` AND (${amenityConditions.join(' AND ')})`;
+            countQuery += ` AND (${amenityConditions.join(' OR ')})`;
         }
 
         const countResult = await request.query(countQuery);
@@ -301,7 +335,7 @@ const searchByArea = async (req, res) => {
 
         res.json({
             success: true,
-            data: result.recordset,
+            data: properties,
             pagination: {
                 total,
                 page: parseInt(page),
@@ -322,4 +356,4 @@ const searchByArea = async (req, res) => {
 module.exports = {
     searchByMap,
     searchByArea
-}; 
+};

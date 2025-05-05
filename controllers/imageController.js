@@ -75,14 +75,16 @@ exports.uploadMultipleImages = async (req, res) => {
 async function uploadImages(req, res) {
   try {
     const { property_id } = req.params;
-    const { images } = req.body;
-
-    if (!images || !Array.isArray(images) || images.length === 0) {
+    
+    // Check if files exist in the request
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Vui lòng cung cấp ít nhất một hình ảnh'
       });
     }
+
+    console.log('Received files:', req.files.length);
 
     // Kiểm tra bất động sản tồn tại
     const request = new sql.Request();
@@ -99,25 +101,52 @@ async function uploadImages(req, res) {
       });
     }
 
-    // Thêm hình ảnh vào database
-    for (let i = 0; i < images.length; i++) {
-      const imageRequest = new sql.Request();
-      imageRequest.input('propertyId', sql.Int, property_id);
-      imageRequest.input('imageUrl', sql.NVarChar, images[i]);
-      imageRequest.input('isPrimary', sql.Bit, i === 0);
-      
-      await imageRequest.query`
-        INSERT INTO PropertyImages (property_id, image_url, is_primary)
-        VALUES (@propertyId, @imageUrl, @isPrimary)
-      `;
-    }
+    // Upload the images to server/cloud storage
+    const uploadPromises = req.files.map(file => {
+      return cloudinary.uploader.upload(file.path, {
+        folder: 'real-estate',
+        resource_type: 'auto'
+      });
+    });
+
+    // Wait for all uploads to complete
+    const uploadResults = await Promise.all(uploadPromises);
+    
+    // Clean up temporary files
+    req.files.forEach(file => {
+      fs.unlinkSync(file.path);
+    });
+
+    // Get the image URLs from the upload results
+    const imageUrls = uploadResults.map(result => result.secure_url);
+    
+    // Chuẩn bị JSON cho trường images
+    const imagesJson = JSON.stringify(imageUrls);
+    const primaryImageUrl = imageUrls[0]; // Sử dụng ảnh đầu tiên làm ảnh chính
+    
+    // Cập nhật Properties với trường images JSON
+    request.input('imagesJson', sql.NVarChar, imagesJson);
+    request.input('primaryImageUrl', sql.NVarChar, primaryImageUrl);
+    
+    await request.query`
+      UPDATE Properties
+      SET images = @imagesJson,
+          primary_image_url = @primaryImageUrl
+      WHERE id = @propertyId
+    `;
+
+    console.log('Updated property with images:', {
+      property_id,
+      images_count: imageUrls.length,
+      primary_image: primaryImageUrl
+    });
 
     res.status(201).json({
       success: true,
       message: 'Thêm hình ảnh thành công',
       data: {
         property_id,
-        images
+        images: imageUrls
       }
     });
   } catch (error) {
@@ -138,16 +167,44 @@ async function getPropertyImages(req, res) {
     request.input('propertyId', sql.Int, property_id);
 
     const result = await request.query`
-      SELECT id, image_url, is_primary, created_at
-      FROM PropertyImages
-      WHERE property_id = @propertyId
-      ORDER BY is_primary DESC, created_at ASC
+      SELECT id, images, primary_image_url
+      FROM Properties
+      WHERE id = @propertyId
     `;
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bất động sản'
+      });
+    }
+
+    const property = result.recordset[0];
+    let imageArray = [];
+
+    // Parse JSON images field
+    if (property.images) {
+      try {
+        imageArray = JSON.parse(property.images);
+      } catch (error) {
+        console.error('Error parsing images JSON:', error);
+      }
+    }
+
+    // If no images found, use primary image if available
+    if (imageArray.length === 0 && property.primary_image_url) {
+      imageArray = [property.primary_image_url];
+    }
 
     res.json({
       success: true,
       message: 'Lấy danh sách hình ảnh thành công',
-      data: result.recordset
+      data: imageArray.map((url, index) => ({
+        id: index + 1,
+        image_url: url,
+        is_primary: index === 0,
+        property_id: parseInt(property_id)
+      }))
     });
   } catch (error) {
     console.error('Lỗi khi lấy danh sách hình ảnh:', error);
@@ -168,34 +225,69 @@ async function deleteImage(req, res) {
     request.input('propertyId', sql.Int, property_id);
     request.input('imageId', sql.Int, image_id);
     
-    // Kiểm tra hình ảnh tồn tại
-    const imageCheck = await request.query`
-      SELECT id, is_primary 
-      FROM PropertyImages 
-      WHERE id = @imageId AND property_id = @propertyId
+    // Get the property with images
+    const propertyResult = await request.query`
+      SELECT images, primary_image_url
+      FROM Properties 
+      WHERE id = @propertyId
     `;
 
-    if (imageCheck.recordset.length === 0) {
+    if (propertyResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bất động sản'
+      });
+    }
+
+    const property = propertyResult.recordset[0];
+    let imageArray = [];
+    
+    // Parse images JSON
+    if (property.images) {
+      try {
+        imageArray = JSON.parse(property.images);
+      } catch (error) {
+        console.error('Error parsing images JSON:', error);
+      }
+    }
+
+    // Convert image_id to index (0-based)
+    const imageIndex = parseInt(image_id) - 1;
+    
+    // Check if the image index is valid
+    if (imageIndex < 0 || imageIndex >= imageArray.length) {
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy hình ảnh'
       });
     }
 
-    // Nếu xóa ảnh chính, cập nhật ảnh chính mới
-    if (imageCheck.recordset[0].is_primary) {
-      await request.query`
-        UPDATE TOP(1) PropertyImages
-        SET is_primary = 1
-        WHERE property_id = @propertyId 
-        AND id != @imageId
-      `;
+    // Get the URL of the image to be deleted
+    const deletedImageUrl = imageArray[imageIndex];
+    
+    // Remove the image from the array
+    imageArray.splice(imageIndex, 1);
+
+    // Check if we deleted the primary image
+    const isPrimaryImage = property.primary_image_url === deletedImageUrl;
+    
+    // Update the primary image if needed
+    let primaryImageUrl = property.primary_image_url;
+    if (isPrimaryImage && imageArray.length > 0) {
+      primaryImageUrl = imageArray[0];
+    } else if (imageArray.length === 0) {
+      primaryImageUrl = null;
     }
 
-    // Xóa hình ảnh
+    // Update the property with the new images array
+    request.input('imagesJson', sql.NVarChar, JSON.stringify(imageArray));
+    request.input('primaryImageUrl', sql.NVarChar, primaryImageUrl);
+    
     await request.query`
-      DELETE FROM PropertyImages
-      WHERE id = @imageId AND property_id = @propertyId
+      UPDATE Properties
+      SET images = @imagesJson,
+          primary_image_url = @primaryImageUrl
+      WHERE id = @propertyId
     `;
 
     res.json({
@@ -221,31 +313,55 @@ async function setPrimaryImage(req, res) {
     request.input('propertyId', sql.Int, property_id);
     request.input('imageId', sql.Int, image_id);
     
-    // Kiểm tra hình ảnh tồn tại
-    const imageCheck = await request.query`
-      SELECT id 
-      FROM PropertyImages 
-      WHERE id = @imageId AND property_id = @propertyId
+    // Get the property with images
+    const propertyResult = await request.query`
+      SELECT images, primary_image_url
+      FROM Properties 
+      WHERE id = @propertyId
     `;
 
-    if (imageCheck.recordset.length === 0) {
+    if (propertyResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bất động sản'
+      });
+    }
+
+    const property = propertyResult.recordset[0];
+    let imageArray = [];
+    
+    // Parse images JSON
+    if (property.images) {
+      try {
+        imageArray = JSON.parse(property.images);
+      } catch (error) {
+        console.error('Error parsing images JSON:', error);
+      }
+    }
+
+    // Convert image_id to index (0-based)
+    const imageIndex = parseInt(image_id) - 1;
+    
+    // Check if the image index is valid
+    if (imageIndex < 0 || imageIndex >= imageArray.length) {
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy hình ảnh'
       });
     }
 
-    // Cập nhật ảnh chính
+    // Get the new primary image URL
+    const newPrimaryImageUrl = imageArray[imageIndex];
+    
+    // No need to reorder the array, just update the primary_image_url
+    
+    // Update the property with the new primary image
+    request.input('primaryImageUrl', sql.NVarChar, newPrimaryImageUrl);
+    
     await request.query`
-      UPDATE PropertyImages
-      SET is_primary = 0
-      WHERE property_id = @propertyId
-    `;
-
-    await request.query`
-      UPDATE PropertyImages
-      SET is_primary = 1
-      WHERE id = @imageId AND property_id = @propertyId
+      UPDATE Properties
+      SET primary_image_url = @primaryImageUrl
+      WHERE id = @propertyId
     `;
 
     res.json({

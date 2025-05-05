@@ -7,12 +7,13 @@ const {
   deleteImage,
   setPrimaryImage
 } = require('../controllers/imageController');
+const { upload, handleUploadError } = require('../middleware/upload');
 
 // Get all images of a property
 router.get('/property/:property_id', getPropertyImages);
 
 // Upload images for a property (protected)
-router.post('/property/:property_id', authenticateToken, uploadImages);
+router.post('/property/:property_id', authenticateToken, upload.array('images', 10), handleUploadError, uploadImages);
 
 // Delete an image (protected)
 router.delete('/property/:property_id/:image_id', authenticateToken, deleteImage);

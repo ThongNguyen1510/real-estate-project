@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1B4F72" />
+    <meta
+      name="description"
+      content="Trang web bất động sản chuyên nghiệp - Mua bán, cho thuê nhà đất, căn hộ, biệt thự, văn phòng tại Việt Nam"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS for Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+    
+    <title>BĐSN Việt Nam - Mua bán, cho thuê bất động sản</title>
+
+    <!-- Test API Connection -->
+    <script>
+      window.addEventListener('DOMContentLoaded', function() {
+        console.log('Testing direct API connection...');
+        fetch('/api/locations/cities', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          mode: 'cors'
+        })
+        .then(response => {
+          console.log('API Connection successful! Status:', response.status);
+          return response.json();
+        })
+        .then(data => {
+          console.log('Cities data loaded:', data);
+        })
+        .catch(error => {
+          console.error('API Connection failed:', error);
+        });
+      });
+    </script>
+  </head>
+  <body>
+    <noscript>Bạn cần bật JavaScript để sử dụng trang web này.</noscript>
+    <div id="root"></div>
+  </body>
+</html> 

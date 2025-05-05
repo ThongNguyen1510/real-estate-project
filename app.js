@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const path = require('path');
 const userRoutes = require('./routes/userRoutes');
 const propertyRoutes = require('./routes/propertiesRoutes');
 const searchRoutes = require('./routes/searchRoutes');
@@ -18,9 +19,39 @@ const reportRoutes = require('./routes/reportRoutes');
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5000', '*'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Access-Control-Request-Method', 'Access-Control-Request-Headers'],
+  exposedHeaders: ['Content-Length', 'Content-Type', 'Authorization'],
+  credentials: true,
+  maxAge: 86400,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+}));
 app.use(express.json());
 app.use(morgan('dev'));
+
+// Phục vụ các file tĩnh từ thư mục uploads - thêm config chi tiết
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: function (res, path, stat) {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
+}));
+
+// Thêm logging middleware để theo dõi các request tới static files
+app.use((req, res, next) => {
+  if (req.url.startsWith('/uploads')) {
+    console.log('Static file request:', req.url);
+    console.log('Request headers:', req.headers);
+  }
+  next();
+});
 
 // Routes
 app.use('/api/auth', userRoutes);  // Auth routes (login, register, etc.)

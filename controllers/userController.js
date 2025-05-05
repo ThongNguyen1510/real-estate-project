@@ -32,15 +32,40 @@ const registerUser = async (req, res) => {
             SELECT SCOPE_IDENTITY() AS id
         `;
 
+        const userId = result.recordset[0].id;
+        
+        // Cập nhật last_login
+        await sql.query`
+            UPDATE Users 
+            SET last_login = GETDATE()
+            WHERE id = ${userId}
+        `;
+
+        // Tạo token JWT
+        const JWT_SECRET = process.env.JWT_SECRET || 'Thong15102004';
+        const token = jwt.sign(
+            { 
+                id: userId, 
+                username: username,
+                role: 'user' 
+            },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+
         res.status(201).json({
             success: true,
             message: 'Đăng ký thành công',
             data: {
-                id: result.recordset[0].id,
+                token,
+                user: {
+                    id: userId,
                 username,
                 name,
                 email,
-                phone
+                    phone,
+                    role: 'user'
+                }
             }
         });
     } catch (error) {
@@ -58,9 +83,9 @@ const loginUser = async (req, res) => {
     const { username, password } = req.body;
     
     try {
-        // Tìm user theo username
+        // Tìm user theo username hoặc email
         const result = await sql.query`
-            SELECT * FROM Users WHERE username = ${username}
+            SELECT * FROM Users WHERE username = ${username} OR email = ${username}
         `;
 
         const user = result.recordset[0];
@@ -68,7 +93,7 @@ const loginUser = async (req, res) => {
         if (!user) {
             return res.status(401).json({
                 success: false,
-                message: 'Username hoặc mật khẩu không đúng'
+                message: 'Username/Email hoặc mật khẩu không đúng'
             });
         }
 
@@ -77,7 +102,7 @@ const loginUser = async (req, res) => {
         if (!isPasswordValid) {
             return res.status(401).json({
                 success: false,
-                message: 'Username hoặc mật khẩu không đúng'
+                message: 'Username/Email hoặc mật khẩu không đúng'
             });
         }
 
@@ -314,21 +339,21 @@ const forgotPassword = async (req, res) => {
         const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
         
         try {
-            await transporter.sendMail({
+        await transporter.sendMail({
                 from: process.env.SMTP_FROM || 'your_email@gmail.com', // Thay bằng email thật
-                to: email,
-                subject: 'Reset mật khẩu',
-                html: `
-                    <h1>Reset mật khẩu</h1>
+            to: email,
+            subject: 'Reset mật khẩu',
+            html: `
+                <h1>Reset mật khẩu</h1>
                     <p>Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản của mình.</p>
-                    <p>Click vào link sau để reset mật khẩu:</p>
-                    <a href="${resetUrl}">${resetUrl}</a>
-                    <p>Link sẽ hết hạn sau 1 giờ.</p>
+                <p>Click vào link sau để reset mật khẩu:</p>
+                <a href="${resetUrl}">${resetUrl}</a>
+                <p>Link sẽ hết hạn sau 1 giờ.</p>
                     <p>Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
-                `
-            });
-            
-            res.json({ success: true, message: 'Email reset mật khẩu đã được gửi' });
+            `
+        });
+
+        res.json({ success: true, message: 'Email reset mật khẩu đã được gửi' });
         } catch (emailError) {
             console.error('Lỗi gửi email:', emailError);
             
@@ -467,48 +492,165 @@ const logout = async (req, res) => {
 // Lấy danh sách bất động sản của người dùng
 const getUserProperties = async (req, res) => {
     try {
-        const properties = await sql.query`
-            SELECT p.*, 
-                   (SELECT TOP 1 url FROM PropertyImages WHERE property_id = p.id) as thumbnail
-            FROM Properties p
-            WHERE p.user_id = ${req.user.id}
-            ORDER BY p.created_at DESC
+        const { page = 1, limit = 10 } = req.query;
+        const userId = req.user.id;
+        const offset = (page - 1) * limit;
+        
+        // Tạo request
+        const request = new sql.Request();
+        request.input('userId', sql.Int, userId);
+        request.input('offset', sql.Int, offset);
+        request.input('limit', sql.Int, limit);
+        
+        // Query lấy danh sách bất động sản với phân trang
+        const query = `
+            SELECT 
+                p.id, p.title, p.price, p.area, p.property_type, p.status, 
+                p.created_at, p.primary_image_url,
+                l.address, l.district, l.city
+            FROM 
+                Properties p
+            LEFT JOIN 
+                Locations l ON p.location_id = l.id
+            WHERE 
+                p.owner_id = @userId
+            ORDER BY 
+                p.created_at DESC
+            OFFSET @offset ROWS
+            FETCH NEXT @limit ROWS ONLY
         `;
-
+        
+        const result = await request.query(query);
+        
+        // Query đếm tổng số bất động sản
+        const countQuery = `
+            SELECT COUNT(*) as total FROM Properties WHERE owner_id = @userId
+        `;
+        
+        const countResult = await request.query(countQuery);
+        const total = countResult.recordset[0].total;
+        
+        // Định dạng kết quả
+        const properties = result.recordset.map(property => {
+            // Map status to listing_type for backward compatibility with frontend
+            let listing_type = 'sale';
+            if (property.status === 'for_rent') {
+                listing_type = 'rent';
+            } else if (property.status === 'for_sale') {
+                listing_type = 'sale';
+            }
+            
+            return {
+                id: property.id,
+                title: property.title,
+                price: property.price,
+                area: property.area,
+                property_type: property.property_type,
+                property_type_display: getPropertyTypeDisplay(property.property_type),
+                listing_type: listing_type, // Add derived listing_type for frontend compatibility
+                status: property.status,
+                status_display: getStatusDisplay(property.status),
+                address: property.address,
+                district: property.district,
+                city: property.city,
+                created_at: property.created_at,
+                image_url: property.primary_image_url || 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?q=80&w=1000&auto=format&fit=crop'
+            };
+        });
+        
         res.json({
             success: true,
-            data: properties.recordset
+            message: 'Lấy danh sách bất động sản thành công',
+            data: {
+                properties,
+                pagination: {
+                    total,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    total_pages: Math.ceil(total / limit)
+                }
+            }
         });
     } catch (error) {
-        console.error('Lỗi get user properties:', error);
+        console.error('Lỗi khi lấy danh sách bất động sản:', error);
         res.status(500).json({
             success: false,
-            message: 'Lỗi server'
+            message: 'Lỗi server',
+            error: error.message
         });
     }
 };
 
-// Lấy danh sách yêu thích
+// Hàm hiển thị loại bất động sản
+const getPropertyTypeDisplay = (type) => {
+    const typeMap = {
+        'house': 'Nhà riêng',
+        'apartment': 'Căn hộ chung cư',
+        'land': 'Đất nền',
+        'commercial': 'Mặt bằng kinh doanh'
+    };
+    return typeMap[type] || type;
+};
+
+// Hàm hiển thị trạng thái
+const getStatusDisplay = (status) => {
+    const statusMap = {
+        'available': 'Đang hiển thị',
+        'pending': 'Chờ duyệt',
+        'sold': 'Đã bán',
+        'rented': 'Đã cho thuê',
+        'expired': 'Hết hạn',
+        'maintenance': 'Bảo trì',
+        'for_rent': 'Cho thuê',
+        'for_sale': 'Đang bán'
+    };
+    return statusMap[status] || status;
+};
+
+// Lấy danh sách bất động sản yêu thích
 const getUserFavorites = async (req, res) => {
     try {
-        const favorites = await sql.query`
-            SELECT p.*, 
-                   (SELECT TOP 1 image_url FROM PropertyImages WHERE property_id = p.id) as thumbnail
-            FROM Properties p
-            INNER JOIN Favorites f ON p.id = f.property_id
-            WHERE f.user_id = ${req.user.id}
-            ORDER BY f.created_at DESC
+        const userId = req.user.id;
+        
+        const result = await sql.query`
+            SELECT 
+                p.id, p.title, p.price, p.property_type, p.status, p.primary_image_url as thumbnail,
+                f.id as favorite_id, f.created_at as added_date
+            FROM 
+                Favorites f
+            JOIN 
+                Properties p ON f.property_id = p.id
+            WHERE 
+                f.user_id = ${userId}
+            ORDER BY 
+                f.created_at DESC
         `;
-
+        
+        // Map status to listing_type for backward compatibility
+        const favorites = result.recordset.map(property => {
+            let listing_type = 'sale';
+            if (property.status === 'for_rent') {
+                listing_type = 'rent';
+            } else if (property.status === 'for_sale') {
+                listing_type = 'sale';
+            }
+            
+            return {
+                ...property,
+                listing_type: listing_type
+            };
+        });
+        
         res.json({
             success: true,
-            data: favorites.recordset
+            data: favorites
         });
     } catch (error) {
-        console.error('Lỗi get user favorites:', error);
+        console.error('Lỗi khi lấy danh sách yêu thích:', error);
         res.status(500).json({
             success: false,
-            message: 'Lỗi server'
+            message: 'Lỗi server',
+            error: error.message
         });
     }
 };
@@ -691,6 +833,92 @@ const removeFromFavorites = async (req, res) => {
     }
 };
 
+// Cập nhật avatar người dùng
+const updateAvatar = async (req, res) => {
+    try {
+        // Kiểm tra thông tin người dùng
+        console.log('User ID:', req.user ? req.user.id : 'undefined');
+        console.log('Request file:', req.file);
+        console.log('Request headers:', req.headers);
+
+        // Khi đến đây, file ảnh đã được upload bởi middleware multer
+        // và lưu trong req.file
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'Không có file ảnh được tải lên'
+            });
+        }
+
+        // Đường dẫn file đã tải lên
+        const baseUrl = process.env.BASE_URL || 'http://localhost:9000';
+        const avatarUrl = `${baseUrl}/uploads/avatars/${req.file.filename}`;
+        console.log('Avatar URL:', avatarUrl);
+
+        try {
+            // Cập nhật avatar_url trong database sử dụng tham số thông thường
+            // thay vì template literal
+            console.log('Updating database...');
+            const updateQuery = 'UPDATE Users SET avatar_url = @avatarUrl WHERE id = @userId';
+            const updateRequest = new sql.Request();
+            updateRequest.input('avatarUrl', sql.NVarChar, avatarUrl);
+            updateRequest.input('userId', sql.Int, req.user.id);
+            await updateRequest.query(updateQuery);
+            
+            console.log('Database updated successfully');
+
+            // Lấy thông tin người dùng sau khi cập nhật sử dụng tham số thông thường
+            console.log('Fetching updated user data...');
+            const selectQuery = 'SELECT id, username, name, email, phone, role, status, avatar_url as avatar FROM Users WHERE id = @userId';
+            const selectRequest = new sql.Request();
+            selectRequest.input('userId', sql.Int, req.user.id);
+            const userResult = await selectRequest.query(selectQuery);
+            
+            console.log('User data fetched:', userResult.recordset[0]);
+
+            if (userResult.recordset.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Không tìm thấy người dùng'
+                });
+            }
+
+            // Trả về kết quả phù hợp với cấu trúc mà frontend mong đợi
+            // Thêm header để cho phép CORS
+            res.header('Access-Control-Allow-Origin', '*');
+            res.header('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE');
+            res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+            
+            // Trả về kết quả với thông tin đầy đủ
+            const responseData = {
+                success: true,
+                message: 'Cập nhật avatar thành công',
+                data: {
+                    avatar: avatarUrl,
+                    user: userResult.recordset[0]
+                }
+            };
+            
+            console.log('Response data:', responseData);
+            res.status(200).json(responseData);
+        } catch (dbError) {
+            console.error('Database error:', dbError);
+            res.status(500).json({
+                success: false,
+                message: 'Lỗi cơ sở dữ liệu',
+                error: dbError.message
+            });
+        }
+    } catch (error) {
+        console.error('Lỗi cập nhật avatar:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
@@ -713,5 +941,6 @@ module.exports = {
     updateNotificationSettings,
     deleteAccount,
     addToFavorites,
-    removeFromFavorites
+    removeFromFavorites,
+    updateAvatar
 };

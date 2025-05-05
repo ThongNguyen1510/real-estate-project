@@ -9,7 +9,9 @@ const {
 // Lấy danh sách thành phố
 const listCities = async (req, res) => {
     try {
+        console.log('Controller: Listing cities');
         const cities = await getCities();
+        console.log('Controller: Found cities:', cities.length);
         
         res.json({
             success: true,
@@ -28,7 +30,9 @@ const listCities = async (req, res) => {
 const listDistricts = async (req, res) => {
     try {
         const { city } = req.params;
+        console.log('Controller: Listing districts for city:', city);
         const districts = await getDistricts(city);
+        console.log('Controller: Found districts:', districts.length);
         
         res.json({
             success: true,
@@ -47,7 +51,9 @@ const listDistricts = async (req, res) => {
 const listWards = async (req, res) => {
     try {
         const { district } = req.params;
+        console.log('Controller: Listing wards for district:', district);
         const wards = await getWards(district);
+        console.log('Controller: Found wards:', wards.length);
         
         res.json({
             success: true,

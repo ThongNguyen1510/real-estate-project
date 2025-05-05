@@ -247,6 +247,8 @@ Tài liệu API được tổ chức theo từng module chức năng:
 - [Vị trí](location_api.md) - Quản lý thông tin về thành phố, quận/huyện, phường/xã
 - [Bản đồ](map_api.md) - Tìm kiếm và hiển thị bất động sản trên bản đồ
 - [Quản trị](admin_api.md) - Các chức năng quản trị hệ thống
+- [Tài liệu](document_api.md) - Quản lý tài liệu liên quan đến bất động sản
+- [Tin tức](news_api.md) - Quản lý tin tức và bài viết về thị trường bất động sản
 
 ## Nguyên tắc API
 

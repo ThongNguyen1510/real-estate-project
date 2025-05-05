@@ -6,7 +6,9 @@ const getCities = async () => {
         const pool = await connectToDatabase();
         const result = await pool.request()
             .query(`
-                SELECT DISTINCT city COLLATE Vietnamese_CI_AI as name
+                SELECT DISTINCT 
+                    city COLLATE Vietnamese_CI_AI as name,
+                    city COLLATE Vietnamese_CI_AI as id
                 FROM Locations
                 WHERE city IS NOT NULL
                 ORDER BY city COLLATE Vietnamese_CI_AI
@@ -26,7 +28,9 @@ const getDistricts = async (city) => {
         const result = await pool.request()
             .input('city', sql.NVarChar, city)
             .query(`
-                SELECT DISTINCT district COLLATE Vietnamese_CI_AI as name
+                SELECT DISTINCT 
+                    district COLLATE Vietnamese_CI_AI as name,
+                    district COLLATE Vietnamese_CI_AI as id
                 FROM Locations
                 WHERE city COLLATE Vietnamese_CI_AI = @city AND district IS NOT NULL
                 ORDER BY district COLLATE Vietnamese_CI_AI
@@ -46,7 +50,9 @@ const getWards = async (district) => {
         const result = await pool.request()
             .input('district', sql.NVarChar, district)
             .query(`
-                SELECT DISTINCT ward COLLATE Vietnamese_CI_AI as name
+                SELECT DISTINCT 
+                    ward COLLATE Vietnamese_CI_AI as name,
+                    ward COLLATE Vietnamese_CI_AI as id
                 FROM Locations
                 WHERE district COLLATE Vietnamese_CI_AI = @district AND ward IS NOT NULL
                 ORDER BY ward COLLATE Vietnamese_CI_AI

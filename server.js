@@ -3,11 +3,19 @@ const app = express();
 const sql = require("mssql");
 const dotenv = require("dotenv");
 const jwt = require("jsonwebtoken");
+const cors = require("cors");
 
 dotenv.config(); // Tải các biến môi trường từ file .env
 
 // Middleware để parse JSON từ request
 app.use(express.json());
+
+// Cấu hình CORS
+app.use(cors({
+    origin: 'http://localhost:3000', // Frontend URL
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Cấu hình database
 const dbConfig = {
@@ -55,9 +63,11 @@ function authenticateToken(req, res, next) {
 // 🏠 **IMPORT ROUTES**
 const userRoutes = require("./routes/userRoutes");
 const propertiesRoutes = require("./routes/propertiesRoutes");
+const locationRoutes = require("./routes/locationRoutes");
 
 app.use("/api/auth", userRoutes);
 app.use("/api/properties", authenticateToken, propertiesRoutes);
+app.use("/api/locations", locationRoutes);
 
 // Kiểm tra route gốc
 app.get("/", (req, res) => {
@@ -65,5 +75,5 @@ app.get("/", (req, res) => {
 });
 
 // Khởi động server
-const PORT = process.env.PORT || 9000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server đang chạy trên cổng ${PORT}`));
