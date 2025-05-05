@@ -1,36 +1,73 @@
 const express = require('express');
-const app = express();
 const cors = require('cors');
-const propertyRoutes = require('./routes/propertiesRoutes');
-const imageRoutes = require('./routes/imageRoutes');
-const reviewRoutes = require('./routes/reviewRoutes');
+const morgan = require('morgan');
+const path = require('path');
 const userRoutes = require('./routes/userRoutes');
-const mapRoutes = require('./routes/mapRoutes');
+const propertyRoutes = require('./routes/propertiesRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const mapRoutes = require('./routes/mapRoutes');
+const imageRoutes = require('./routes/imageRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const newsRoutes = require('./routes/newsRoutes');
+const locationRoutes = require('./routes/locationRoutes');
+const appointmentRoutes = require('./routes/appointmentRoutes');
+const documentRoutes = require('./routes/documentRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+
+const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5000', '*'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Access-Control-Request-Method', 'Access-Control-Request-Headers'],
+  exposedHeaders: ['Content-Length', 'Content-Type', 'Authorization'],
+  credentials: true,
+  maxAge: 86400,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+}));
 app.use(express.json());
+app.use(morgan('dev'));
 
-// Request logging middleware
+// Phục vụ các file tĩnh từ thư mục uploads - thêm config chi tiết
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: function (res, path, stat) {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
+}));
+
+// Thêm logging middleware để theo dõi các request tới static files
 app.use((req, res, next) => {
-  console.log('\n=== Incoming Request ===');
-  console.log('Time:', new Date().toISOString());
-  console.log('Method:', req.method);
-  console.log('URL:', req.url);
-  console.log('Query:', req.query);
-  console.log('Body:', req.body);
-  console.log('======================\n');
+  if (req.url.startsWith('/uploads')) {
+    console.log('Static file request:', req.url);
+    console.log('Request headers:', req.headers);
+  }
   next();
 });
 
 // Routes
-app.use('/api/auth', userRoutes);
+app.use('/api/auth', userRoutes);  // Auth routes (login, register, etc.)
+app.use('/api/users', userRoutes); // User profile routes
 app.use('/api/properties', propertyRoutes);
-app.use('/api/properties', reviewRoutes);
-app.use('/api/images', imageRoutes);
-app.use('/api/map', mapRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/map', mapRoutes);
+app.use('/api/images', imageRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/news', newsRoutes);
+app.use('/api/locations', locationRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/documents', documentRoutes); // Tài liệu
+app.use('/api/notifications', notificationRoutes); // Thông báo
+app.use('/api', reportRoutes); // Báo cáo tin đăng
 
 // Log registered routes
 console.log('\n=== Registered Routes ===');
@@ -51,22 +88,19 @@ console.log('======================\n');
 
 // Error handling
 app.use((err, req, res, next) => {
-  console.error('\n=== Error ===');
-  console.error('Time:', new Date().toISOString());
-  console.error('URL:', req.url);
-  console.error('Error:', err.stack);
-  console.error('======================\n');
-  res.status(500).json({ message: 'Lỗi server' });
+    console.error(err.stack);
+    res.status(500).json({
+        success: false,
+        message: 'Lỗi server'
+    });
 });
 
 // 404 handler
 app.use((req, res) => {
-  console.log('\n=== 404 Not Found ===');
-  console.log('Time:', new Date().toISOString());
-  console.log('Method:', req.method);
-  console.log('URL:', req.url);
-  console.log('======================\n');
-  res.status(404).json({ message: 'Không tìm thấy route này' });
+    res.status(404).json({
+        success: false,
+        message: 'API không tồn tại'
+    });
 });
 
 module.exports = app; 

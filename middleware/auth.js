@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { sql, connectToDatabase } = require('../config/database');
 require('dotenv').config();
 
 const auth = async (req, res, next) => {
@@ -15,9 +16,10 @@ const auth = async (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
+    console.error('Auth error:', error);
     res.status(401).json({
       success: false,
-      message: 'Token không hợp lệ hoặc đã hết hạn'
+      message: 'Token không hợp lệ'
     });
   }
 };
@@ -25,18 +27,24 @@ const auth = async (req, res, next) => {
 // Middleware kiểm tra quyền admin
 const isAdmin = async (req, res, next) => {
   try {
-    if (req.user.role !== 'admin') {
+    const pool = await connectToDatabase();
+    const result = await pool.request()
+      .input('userId', sql.Int, req.user.id)
+      .query('SELECT role FROM Users WHERE id = @userId');
+
+    if (result.recordset.length === 0 || result.recordset[0].role !== 'admin') {
       return res.status(403).json({
         success: false,
-        message: 'Bạn không có quyền thực hiện thao tác này'
+        message: 'Không có quyền truy cập'
       });
     }
+
     next();
   } catch (error) {
+    console.error('isAdmin check error:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server',
-      error: error.message
+      message: 'Lỗi server'
     });
   }
 };
