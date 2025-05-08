@@ -13,6 +13,9 @@ import {
 } from '@mui/icons-material';
 import HeroSection from '../components/home/HeroSection';
 import FeaturedProperties from '../components/home/FeaturedProperties';
+import SearchHeader from '../components/search/SearchHeader';
+import ProvinceList from '../components/search/ProvinceList';
+import HomeNews from '../components/home/HomeNews';
 
 const HomePage: React.FC = () => {
   const theme = useTheme();
@@ -59,38 +62,13 @@ const HomePage: React.FC = () => {
     },
   ];
   
-  // Mock popular locations
-  const popularLocations = [
-    {
-      name: 'TP. Hồ Chí Minh',
-      image: '/img/locations/hcm.jpg',
-      count: 4250,
-      path: '/tim-kiem?city_id=1'
-    },
-    {
-      name: 'Hà Nội',
-      image: '/img/locations/hanoi.jpg',
-      count: 3180,
-      path: '/tim-kiem?city_id=2'
-    },
-    {
-      name: 'Đà Nẵng',
-      image: '/img/locations/danang.jpg',
-      count: 1250,
-      path: '/tim-kiem?city_id=3'
-    },
-    {
-      name: 'Nha Trang',
-      image: '/img/locations/nhatrang.jpg',
-      count: 950,
-      path: '/tim-kiem?city_id=4'
-    },
-  ];
-  
   return (
     <Box>
       {/* Hero Section */}
       <HeroSection />
+      
+      {/* SearchHeader được thêm vào ngay sau HeroSection */}
+      <SearchHeader />
       
       {/* Statistics Section */}
       <Box sx={{ py: 6, bgcolor: 'white' }}>
@@ -137,11 +115,14 @@ const HomePage: React.FC = () => {
         </Container>
       </Box>
       
+      {/* News Section */}
+      <HomeNews />
+      
       {/* Featured Properties Section */}
       <FeaturedProperties />
       
       {/* Property Types Section */}
-      <Box sx={{ py: 8, bgcolor: 'white' }}>
+      <Box sx={{ py: 8, bgcolor: 'background.default' }}>
         <Container maxWidth="lg">
           <Box sx={{ textAlign: 'center', mb: 6 }}>
             <Typography 
@@ -255,10 +236,10 @@ const HomePage: React.FC = () => {
         </Container>
       </Box>
       
-      {/* Popular Locations Section */}
-      <Box sx={{ py: 8, bgcolor: theme.palette.grey[50] }}>
+      {/* Popular Provinces Section - Using ProvinceList component */}
+      <Box sx={{ py: 8, bgcolor: 'background.default' }}>
         <Container maxWidth="lg">
-          <Box sx={{ textAlign: 'center', mb: 6 }}>
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Typography 
               variant="h4" 
               component="h2" 
@@ -280,107 +261,24 @@ const HomePage: React.FC = () => {
                 }
               }}
             >
-              Khu vực phổ biến
+              Khám phá bất động sản theo địa điểm
             </Typography>
             
             <Typography 
               variant="subtitle1" 
               color="text.secondary"
               sx={{ 
-                mt: 3, 
-                mb: 4,
+                mt: 3,
                 maxWidth: 700,
                 mx: 'auto'
               }}
             >
-              Khám phá các bất động sản tại các khu vực hàng đầu với tiềm năng phát triển và sinh lời cao
+              Tìm kiếm bất động sản ở các tỉnh thành trên khắp Việt Nam
             </Typography>
           </Box>
-          
-          <Grid container spacing={3}>
-            {popularLocations.map((location, index) => (
-              <Grid item xs={12} sm={6} md={3} key={index}>
-                <Box
-                  component="a"
-                  href={location.path}
-                  sx={{
-                    position: 'relative',
-                    height: 250,
-                    borderRadius: 3,
-                    overflow: 'hidden',
-                    display: 'block',
-                    textDecoration: 'none',
-                    boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-10px)',
-                      boxShadow: '0 12px 24px rgba(0,0,0,0.15)',
-                      '& .overlay': {
-                        backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                      },
-                      '& img': {
-                        transform: 'scale(1.1)',
-                      }
-                    }
-                  }}
-                >
-                  {/* Background Image */}
-                  <Box
-                    component="img"
-                    src={location.image}
-                    alt={location.name}
-                    sx={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      transition: 'transform 0.5s ease',
-                    }}
-                  />
-                  
-                  {/* Overlay */}
-                  <Box
-                    className="overlay"
-                    sx={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                      transition: 'all 0.3s ease',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      padding: 3,
-                    }}
-                  >
-                    <Typography
-                      variant="h5"
-                      component="h3"
-                      color="white"
-                      sx={{
-                        fontWeight: 'bold',
-                        mb: 1,
-                        textAlign: 'center',
-                      }}
-                    >
-                      {location.name}
-                    </Typography>
-                    
-                    <Typography
-                      variant="body1"
-                      color="white"
-                      sx={{ opacity: 0.9 }}
-                    >
-                      {location.count} bất động sản
-                    </Typography>
-                  </Box>
-                </Box>
-              </Grid>
-            ))}
-          </Grid>
         </Container>
+        
+        <ProvinceList />
       </Box>
       
       {/* Call to Action Section */}

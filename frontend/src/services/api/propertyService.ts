@@ -83,9 +83,12 @@ export const deleteProperty = async (id: string | number) => {
 // Tìm kiếm bất động sản
 export const searchProperties = async (params = {}) => {
   try {
+    console.log('Calling search API with params:', params);
     const response = await axios.get(`${API_URL}/properties/search`, { params });
+    console.log('Search API response:', response.data);
     return response.data;
   } catch (error: any) {
+    console.error('Error searching properties:', error);
     if (error.response) {
       return error.response.data;
     }
@@ -112,15 +115,24 @@ export const uploadImages = async (propertyId: string, formData: FormData) => {
 };
 
 // Thêm/xóa bất động sản vào/khỏi yêu thích
-export const toggleFavorite = async (id: string | number) => {
+export const toggleFavorite = async (propertyId: number | string) => {
   try {
-    const response = await axios.post(`${API_URL}/properties/${id}/favorite`, null, {
+    // First check if this property is currently favorited 
+    // If needed, we would implement a check endpoint here
+    
+    // Toggle endpoint handles both add and remove
+    const response = await axios.post(`${API_URL}/properties/${propertyId}/favorite`, null, {
       headers: {
         Authorization: `Bearer ${getAccessToken()}`
       }
     });
+    
+    // Log response for debugging
+    console.log(`Toggle favorite for property ${propertyId}:`, response.data);
+    
     return response.data;
   } catch (error: any) {
+    console.error(`Error toggling favorite for property ${propertyId}:`, error);
     if (error.response) {
       return error.response.data;
     }

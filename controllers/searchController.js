@@ -204,13 +204,17 @@ const searchByArea = async (req, res) => {
             });
         }
 
+        console.log('Searching by area with province:', province);
+
         const offset = (page - 1) * limit;
         let query = `
             SELECT 
                 p.*,
-                p.primary_image_url as thumbnail
+                p.primary_image_url as thumbnail,
+                l.city, l.district, l.ward
             FROM Properties p
-            WHERE p.province = @province
+            LEFT JOIN Locations l ON p.location_id = l.id
+            WHERE l.city = @province
         `;
 
         const params = [
@@ -218,12 +222,12 @@ const searchByArea = async (req, res) => {
         ];
 
         if (district) {
-            query += ' AND p.district = @district';
+            query += ' AND l.district = @district';
             params.push({ name: 'district', value: district });
         }
 
         if (ward) {
-            query += ' AND p.ward = @ward';
+            query += ' AND l.ward = @ward';
             params.push({ name: 'ward', value: ward });
         }
 
@@ -310,11 +314,12 @@ const searchByArea = async (req, res) => {
         let countQuery = `
             SELECT COUNT(*) as total
             FROM Properties p
-            WHERE p.province = @province
+            LEFT JOIN Locations l ON p.location_id = l.id
+            WHERE l.city = @province
         `;
 
-        if (district) countQuery += ' AND p.district = @district';
-        if (ward) countQuery += ' AND p.ward = @ward';
+        if (district) countQuery += ' AND l.district = @district';
+        if (ward) countQuery += ' AND l.ward = @ward';
         if (price_min) countQuery += ' AND p.price >= @price_min';
         if (price_max) countQuery += ' AND p.price <= @price_max';
         if (property_type) countQuery += ' AND p.property_type = @property_type';

@@ -17,9 +17,12 @@ import {
   Search as SearchIcon,
   LocationOn as LocationIcon,
   Home as HomeIcon,
-  AttachMoney as MoneyIcon
+  AttachMoney as MoneyIcon,
+  ArrowForward as ArrowForwardIcon
 } from '@mui/icons-material';
 import { locationService } from '../../services/api';
+import SearchBox from '../search/SearchBox';
+import { Link } from 'react-router-dom';
 
 interface City {
   id: number;
@@ -194,315 +197,107 @@ const HeroSection: React.FC = () => {
     <Box
       sx={{
         position: 'relative',
-        height: { xs: 'auto', md: '600px' },
-        overflow: 'hidden',
-        bgcolor: 'primary.main',
+        height: { xs: '400px', md: '500px' },
+        backgroundImage: 'url(/img/hero-bg.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
         color: 'white',
-      }}
-    >
-      {/* Background Image with Overlay */}
-      <Box
-        sx={{
+        display: 'flex',
+        alignItems: 'center',
+        '&::before': {
+          content: '""',
           position: 'absolute',
           top: 0,
           left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundImage: 'linear-gradient(135deg, #1B4F72 0%, #2E86C1 100%)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          '&::after': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          },
-        }}
-      />
-      
-      {/* Content */}
-      <Container 
-        maxWidth="lg" 
-        sx={{ 
-          position: 'relative', 
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)'
+        }
+      }}
+    >
+      <Container
+        maxWidth="lg"
+        sx={{
+          position: 'relative',
           zIndex: 1,
-          height: '100%',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          py: { xs: 5, md: 0 }
+          textAlign: 'center',
+          px: { xs: 2, sm: 3 }
         }}
       >
-        <Grid container spacing={4}>
-          {/* Text Content */}
-          <Grid item xs={12} md={6}>
-            <Typography
-              variant="h2"
-              component="h1"
-              sx={{
-                fontWeight: 'bold',
-                mb: 2,
-                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
-              }}
-            >
-              Tìm ngôi nhà mơ ước của bạn
-            </Typography>
-            
-            <Typography
-              variant="h6"
-              component="p"
-              sx={{
-                mb: 4,
-                opacity: 0.9,
-                maxWidth: '90%',
-              }}
-            >
-              Khám phá hàng ngàn bất động sản chất lượng với mức giá phù hợp tại các vị trí đắc địa trên toàn quốc.
-            </Typography>
-            
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              <Button
-                variant="contained"
-                color="secondary"
-                size="large"
-                sx={{ px: 3, py: 1.5, fontWeight: 'bold' }}
-                href="/mua-ban"
-              >
-                Mua bất động sản
-              </Button>
-              
-              <Button
-                variant="outlined"
-                size="large"
-                sx={{ 
-                  px: 3, 
-                  py: 1.5, 
-                  fontWeight: 'bold',
-                  borderColor: 'white',
-                  color: 'white',
-                  '&:hover': {
-                    borderColor: 'white',
-                    bgcolor: 'rgba(255, 255, 255, 0.1)',
-                  }
-                }}
-                href="/cho-thue"
-              >
-                Thuê bất động sản
-              </Button>
-            </Box>
-          </Grid>
-          
-          {/* Search Form */}
-          <Grid item xs={12} md={6}>
-            <Paper
-              elevation={3}
-              component="form"
-              onSubmit={handleSearchSubmit}
-              sx={{
-                p: 3,
-                borderRadius: 2,
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              }}
-            >
-              <Typography
-                variant="h5"
-                component="h2"
-                sx={{
-                  mb: 3,
-                  color: 'text.primary',
-                  fontWeight: 'bold',
-                  textAlign: 'center',
-                }}
-              >
-                Tìm kiếm bất động sản
-              </Typography>
-              
-              {/* Search Keyword */}
-              <TextField
-                fullWidth
-                placeholder="Nhập từ khóa tìm kiếm..."
-                name="keyword"
-                value={searchParams.keyword}
-                onChange={handleInputChange}
-                sx={{ mb: 2 }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon color="action" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              
-              {/* Transaction Type */}
-              <TextField
-                select
-                fullWidth
-                name="transaction_type"
-                value={searchParams.transaction_type}
-                onChange={handleInputChange}
-                sx={{ mb: 2 }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <HomeIcon color="action" />
-                    </InputAdornment>
-                  ),
-                }}
-              >
-                {transactionTypes.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-              
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  {/* Property Type */}
-                  <TextField
-                    select
-                    fullWidth
-                    name="property_type"
-                    value={searchParams.property_type}
-                    onChange={handleInputChange}
-                    sx={{ mb: 2 }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <HomeIcon color="action" />
-                        </InputAdornment>
-                      ),
-                    }}
-                  >
-                    {propertyTypes.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-                
-                <Grid item xs={12} sm={6}>
-                  {/* City */}
-                  <TextField
-                    select
-                    fullWidth
-                    name="city_id"
-                    value={searchParams.city_id}
-                    onChange={handleInputChange}
-                    sx={{ mb: 2 }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <LocationIcon color="action" />
-                        </InputAdornment>
-                      ),
-                    }}
-                  >
-                    <MenuItem value={0}>Tất cả tỉnh thành</MenuItem>
-                    {cities.map((city) => (
-                      <MenuItem key={city.id} value={city.id}>
-                        {city.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-              </Grid>
-              
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  {/* District - Only show if city is selected */}
-                  <TextField
-                    select
-                    fullWidth
-                    name="district_id"
-                    value={searchParams.district_id}
-                    onChange={handleInputChange}
-                    disabled={!searchParams.city_id}
-                    sx={{ mb: 2 }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <LocationIcon color="action" />
-                        </InputAdornment>
-                      ),
-                    }}
-                  >
-                    <MenuItem value={0}>Tất cả quận huyện</MenuItem>
-                    {filteredDistricts.map((district) => (
-                      <MenuItem key={district.id} value={district.id}>
-                        {district.name}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-                
-                <Grid item xs={12} sm={6}>
-                  {/* Price Range */}
-                  <TextField
-                    select
-                    fullWidth
-                    name="price_range"
-                    value={searchParams.price_range}
-                    onChange={handleInputChange}
-                    sx={{ mb: 2 }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <MoneyIcon color="action" />
-                        </InputAdornment>
-                      ),
-                    }}
-                  >
-                    {priceRanges.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-              </Grid>
-              
-              {/* Area Range */}
-              <TextField
-                select
-                fullWidth
-                name="area_range"
-                value={searchParams.area_range}
-                onChange={handleInputChange}
-                sx={{ mb: 3 }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <HomeIcon color="action" />
-                    </InputAdornment>
-                  ),
-                }}
-              >
-                {areaRanges.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-              
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                fullWidth
-                size="large"
-                sx={{ py: 1.5, fontWeight: 'bold' }}
-              >
-                <SearchIcon sx={{ mr: 1 }} /> Tìm kiếm
-              </Button>
-            </Paper>
-          </Grid>
-        </Grid>
+        <Typography
+          variant="h2"
+          component="h1"
+          sx={{
+            fontWeight: 'bold',
+            mb: 2,
+            fontSize: { xs: '2rem', sm: '2.5rem', md: '3.5rem' }
+          }}
+        >
+          Tìm Ngôi Nhà Mơ Ước Của Bạn
+        </Typography>
+
+        <Typography
+          variant="h5"
+          sx={{
+            mb: 4,
+            maxWidth: '800px',
+            fontSize: { xs: '1rem', sm: '1.25rem' }
+          }}
+        >
+          Khám phá hàng ngàn bất động sản chất lượng từ khắp Việt Nam
+        </Typography>
+
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            gap: 2
+          }}
+        >
+          <Button
+            variant="contained"
+            color="primary"
+            size="large"
+            component={Link}
+            to="/mua-ban"
+            endIcon={<ArrowForwardIcon />}
+            sx={{
+              px: 3,
+              py: 1.5,
+              fontSize: '1rem',
+              borderRadius: 2
+            }}
+          >
+            Mua Bất Động Sản
+          </Button>
+
+          <Button
+            variant="outlined"
+            color="inherit"
+            size="large"
+            component={Link}
+            to="/cho-thue"
+            endIcon={<ArrowForwardIcon />}
+            sx={{
+              px: 3,
+              py: 1.5,
+              fontSize: '1rem',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              borderColor: 'white',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                borderColor: 'white'
+              },
+              borderRadius: 2
+            }}
+          >
+            Thuê Bất Động Sản
+          </Button>
+        </Box>
       </Container>
     </Box>
   );

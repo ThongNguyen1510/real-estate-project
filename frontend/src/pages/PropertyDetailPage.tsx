@@ -38,8 +38,12 @@ import {
   Share as ShareIcon,
   ContentCopy as ContentCopyIcon
 } from '@mui/icons-material';
-import { propertyService, favoritesService, userService } from '../services/api';
+import { getProperty } from '../services/api/propertyService';
+import { getUserInfo } from '../services/api/userService';
+import { locationService, } from '../services/api';
+import { getLocationNames } from '../services/api/locationService';
 import { useAuth } from '../contexts/AuthContext';
+import { useFavorites } from '../contexts/FavoritesContext';
 
 // Format currency (VND)
 const formatCurrency = (value: number) => {
@@ -78,11 +82,48 @@ const formatDate = (dateString: string | null | undefined) => {
   }
 };
 
+// Function to format phone number with asterisks
+const formatPhoneWithAsterisk = (phone: string | undefined): string => {
+  if (!phone) return "Chưa có số điện thoại";
+  
+  // Format phone number: XXXX XXX *** • Hiện số
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length < 8) return phone;
+  
+  const part1 = cleaned.substring(0, 4);
+  const part2 = cleaned.substring(4, 7);
+  
+  return `${part1} ${part2} *** • Hiện số`;
+};
+
+// Define a basic property type
+interface PropertyData {
+  id?: number | string;
+  title?: string;
+  description?: string;
+  price?: number;
+  area?: number;
+  property_type?: string;
+  listing_type?: string;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  city?: string;
+  city_name?: string;
+  district?: string;
+  district_name?: string;
+  ward?: string;
+  ward_name?: string;
+  address?: string;
+  owner_id?: number;
+  [key: string]: any; // Allow for other properties
+}
+
 const PropertyDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { isAuthenticated } = useAuth();
+  const { favorites, toggleFavorite, isFavorite: checkIsFavorite } = useFavorites();
   
   // State for property data
   const [property, setProperty] = useState<any>(null);
@@ -96,11 +137,32 @@ const PropertyDetailPage: React.FC = () => {
   
   // State for favorites
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
-  const [favoriteId, setFavoriteId] = useState<string | null>(null);
   const [favLoading, setFavLoading] = useState<boolean>(false);
+  
+  // State for owner data
+  const [ownerData, setOwnerData] = useState<any>(null);
+  
+  // Add state for location data
+  const [locationNames, setLocationNames] = useState<{
+    city_name: string;
+    district_name: string;
+    ward_name: string;
+  }>({
+    city_name: '',
+    district_name: '',
+    ward_name: ''
+  });
   
   // Add state for copy notification
   const [copySuccess, setCopySuccess] = useState(false);
+  
+  // Thêm state cho việc hiển thị số điện thoại đầy đủ
+  const [showFullPhone, setShowFullPhone] = useState<boolean>(false);
+  
+  // Effect to scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   
   // Fetch property data
   useEffect(() => {
@@ -111,11 +173,38 @@ const PropertyDetailPage: React.FC = () => {
       try {
         if (!id) throw new Error('Không tìm thấy mã bất động sản');
         
-        const response = await propertyService.getProperty(id);
+        const response = await getProperty(id);
         
         if (response.success) {
           console.log('API response:', response.data);
-          setProperty(response.data.property);
+          // Log thông tin để debug
+          console.log('Owner info:', response.data.property.owner);
+          console.log('Owner info type:', typeof response.data.property.owner);
+          
+          // Đảm bảo property.owner là object
+          const propertyData: PropertyData = {
+            ...response.data.property,
+            owner: response.data.property.owner || 
+                  response.data.owner || 
+                  (response.data.property.owner_id ? { id: response.data.property.owner_id } : {}),
+            // Ensure all location fields exist to avoid TypeScript errors
+            city: response.data.property.city || undefined,
+            district: response.data.property.district || undefined,
+            ward: response.data.property.ward || undefined,
+            city_name: response.data.property.city_name || undefined,
+            district_name: response.data.property.district_name || undefined,
+            ward_name: response.data.property.ward_name || undefined
+          };
+          
+          setProperty(propertyData);
+          
+          // Tải thông tin chủ sở hữu nếu có owner_id
+          if (propertyData.owner_id) {
+            fetchOwnerData(propertyData.owner_id);
+          }
+          
+          // Fetch location names if not already provided
+          await fetchLocationNames(propertyData);
           
           // Set images - xử lý cẩn thận các URL từ API
           let imageUrls: string[] = [];
@@ -148,28 +237,17 @@ const PropertyDetailPage: React.FC = () => {
           // Record view if authenticated
           if (isAuthenticated) {
             try {
-              await userService.addRecentlyViewed(response.data.property.id);
+              console.log('View recorded for property:', response.data.property.id);
+              // Commented out as addRecentlyViewed is not implemented yet
+              // await addRecentlyViewed(response.data.property.id);
             } catch (error) {
               console.error('Error recording view:', error);
             }
           }
           
-          // Check if property is in favorites
-          if (isAuthenticated) {
-            try {
-              const favoritesResponse = await favoritesService.getFavorites();
-              if (favoritesResponse.success) {
-                const favorite = favoritesResponse.data.find(
-                  (fav: any) => fav.property_id === response.data.property.id
-                );
-                if (favorite) {
-                  setIsFavorite(true);
-                  setFavoriteId(favorite.id);
-                }
-              }
-            } catch (error) {
-              console.error('Error checking favorites:', error);
-            }
+          // Check if property is in favorites using context
+          if (id) {
+            setIsFavorite(checkIsFavorite(Number(id)));
           }
         } else {
           setError(response.message || 'Không thể tải thông tin bất động sản');
@@ -183,34 +261,176 @@ const PropertyDetailPage: React.FC = () => {
     };
     
     fetchPropertyData();
-  }, [id, isAuthenticated]);
+  }, [id, isAuthenticated, checkIsFavorite]);
+  
+  // New function to fetch location names
+  const fetchLocationNames = async (propertyData: PropertyData) => {
+    try {
+      // Check if we already have the location names
+      if (propertyData.city_name && propertyData.district_name && propertyData.ward_name) {
+        setLocationNames({
+          city_name: propertyData.city_name,
+          district_name: propertyData.district_name,
+          ward_name: propertyData.ward_name
+        });
+        return;
+      }
+
+      // Try to fetch all names at once using the new API
+      try {
+        const locationNamesResponse = await getLocationNames(
+          propertyData.city || null, 
+          propertyData.district || null, 
+          propertyData.ward || null
+        );
+        
+        if (locationNamesResponse.success && locationNamesResponse.data) {
+          const { city_name, district_name, ward_name } = locationNamesResponse.data;
+          
+          // Update location names state
+          setLocationNames({
+            city_name: city_name || (propertyData.city || ''),
+            district_name: district_name || (propertyData.district || ''),
+            ward_name: ward_name || (propertyData.ward || '')
+          });
+          
+          // Update property data with location names
+          setProperty((prev: PropertyData) => ({
+            ...prev,
+            city_name: city_name || prev.city || '',
+            district_name: district_name || prev.district || '',
+            ward_name: ward_name || prev.ward || ''
+          }));
+          
+          return;
+        }
+      } catch (error) {
+        console.error('Error fetching location names with bulk API:', error);
+        // Continue with individual fetches as fallback
+      }
+
+      // Initialize with location IDs as fallback
+      let cityName = propertyData.city || '';
+      let districtName = propertyData.district || '';
+      let wardName = propertyData.ward || '';
+
+      // Fetch city name if needed
+      if (propertyData.city && !propertyData.city_name) {
+        try {
+          const citiesResponse = await locationService.getCities();
+          if (citiesResponse && citiesResponse.success && Array.isArray(citiesResponse.data)) {
+            const cityObject = citiesResponse.data.find((city: any) => 
+              city && city.id && propertyData.city && city.id.toString() === propertyData.city.toString()
+            );
+            if (cityObject && cityObject.name) {
+              cityName = cityObject.name;
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching city name:', error);
+        }
+      }
+
+      // Fetch district name if needed
+      if (propertyData.district && !propertyData.district_name) {
+        try {
+          // Only attempt to fetch districts if city is available
+          if (propertyData.city) {
+            const districtsResponse = await locationService.getDistricts(propertyData.city);
+            if (districtsResponse && districtsResponse.success && Array.isArray(districtsResponse.data)) {
+              const districtObject = districtsResponse.data.find((district: any) => 
+                district && district.id && propertyData.district && 
+                district.id.toString() === propertyData.district.toString()
+              );
+              if (districtObject && districtObject.name) {
+                districtName = districtObject.name;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching district name:', error);
+        }
+      }
+
+      // Fetch ward name if needed
+      if (propertyData.ward && !propertyData.ward_name) {
+        try {
+          // Only attempt to fetch wards if district is available
+          if (propertyData.district) {
+            const wardsResponse = await locationService.getWards(propertyData.district);
+            if (wardsResponse && wardsResponse.success && Array.isArray(wardsResponse.data)) {
+              const wardObject = wardsResponse.data.find((ward: any) => 
+                ward && ward.id && propertyData.ward && 
+                ward.id.toString() === propertyData.ward.toString()
+              );
+              if (wardObject && wardObject.name) {
+                wardName = wardObject.name;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching ward name:', error);
+        }
+      }
+
+      // Update location names state
+      setLocationNames({
+        city_name: cityName,
+        district_name: districtName,
+        ward_name: wardName
+      });
+
+      // Update property data with location names
+      setProperty((prev: PropertyData) => ({
+        ...prev,
+        city_name: cityName,
+        district_name: districtName,
+        ward_name: wardName
+      }));
+    } catch (error) {
+      console.error('Error fetching location names:', error);
+    }
+  };
+
+  // Hàm tải thông tin chủ sở hữu
+  const fetchOwnerData = async (ownerId: number) => {
+    try {
+      console.log('Fetching owner data for ID:', ownerId);
+      const response = await getUserInfo(ownerId);
+      console.log('Raw API response for owner data:', response);
+      
+      if (response && response.success) {
+        console.log('Owner data successfully fetched:', response.data);
+        // Kiểm tra response.data có đủ thông tin không
+        if (!response.data.full_name && !response.data.phone && !response.data.avatar_url) {
+          console.warn('Owner data is incomplete', response.data);
+        }
+        setOwnerData(response.data);
+      } else {
+        console.error('Owner data fetch failed:', response.message || 'Unknown error');
+      }
+    } catch (err) {
+      console.error('Error fetching owner data:', err);
+    }
+  };
   
   // Handle favorite toggle
   const handleFavoriteToggle = async () => {
     if (!isAuthenticated) {
-      // Redirect to login
-      window.location.href = '/login';
+      // Display login message
+      setCopySuccess(true);
       return;
     }
     
+    if (!id) return;
     setFavLoading(true);
     
     try {
-      if (isFavorite && favoriteId) {
-        // Remove from favorites
-        const response = await favoritesService.removeFavorite(favoriteId);
-        if (response.success) {
-          setIsFavorite(false);
-          setFavoriteId(null);
-        }
-      } else {
-        // Add to favorites
-        const response = await favoritesService.addFavorite(id || '');
-        if (response.success) {
-          setIsFavorite(true);
-          setFavoriteId(response.data.id);
-        }
-      }
+      // Use context's toggleFavorite function
+      await toggleFavorite(Number(id));
+      
+      // Update local state
+      setIsFavorite(!isFavorite);
     } catch (error) {
       console.error('Error toggling favorite:', error);
     } finally {
@@ -244,6 +464,27 @@ const PropertyDetailPage: React.FC = () => {
         console.error('Failed to copy text');
       }
     );
+  };
+  
+  // Hàm để hiển thị số điện thoại phù hợp
+  const displayPhoneNumber = (phone: string | undefined): string => {
+    if (!phone) return "Chưa có số điện thoại";
+    
+    if (showFullPhone) {
+      // Hiển thị số điện thoại đầy đủ đã được format
+      const cleaned = phone.replace(/\D/g, '');
+      if (cleaned.length <= 4) return phone;
+      
+      // Format theo nhóm chữ số
+      if (cleaned.length <= 7) {
+        return `${cleaned.substring(0, 4)} ${cleaned.substring(4)}`;
+      }
+      
+      return `${cleaned.substring(0, 4)} ${cleaned.substring(4, 7)} ${cleaned.substring(7)}`;
+    } else {
+      // Hiển thị số điện thoại với dấu sao
+      return formatPhoneWithAsterisk(phone);
+    }
   };
   
   // If loading
@@ -295,7 +536,10 @@ const PropertyDetailPage: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, color: 'text.secondary' }}>
             <LocationIcon fontSize="small" />
             <Typography variant="body1" sx={{ ml: 0.5 }}>
-              {property.address}, {property.district}, {property.city}
+              {property.address}
+              {locationNames.ward_name ? `, ${locationNames.ward_name}` : property.ward ? `, ${property.ward}` : ''}
+              {locationNames.district_name ? `, ${locationNames.district_name}` : property.district ? `, ${property.district}` : ''}
+              {locationNames.city_name ? `, ${locationNames.city_name}` : property.city ? `, ${property.city}` : ''}
             </Typography>
           </Box>
           
@@ -590,37 +834,33 @@ const PropertyDetailPage: React.FC = () => {
           
           {/* Contact info - styled more like example image */}
           <Paper elevation={3} sx={{ p: 0, mb: 3, borderRadius: 2, overflow: 'hidden' }}>
-            {/* Header with professional title */}
-            <Box sx={{ bgcolor: 'primary.main', color: 'white', py: 1.5, px: 3 }}>
-              <Typography variant="subtitle1" fontWeight="medium">
-                Môi giới chuyên nghiệp
-              </Typography>
-            </Box>
-
-            {/* Contact buttons section */}
+            {/* Contact info with avatar and name */}
             <Box sx={{ p: 3 }}>
-              {/* Phone number with copy function */}
-              {(property.contact_info || (property.owner && property.owner.phone)) && (
-                <Button
-                  fullWidth
-                  variant="contained"
-                  color="primary"
-                  startIcon={<PhoneIcon />}
-                  endIcon={<ContentCopyIcon fontSize="small" />}
+              {/* User info với avatar lấy từ dữ liệu thật */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
+                <Avatar 
+                  src={(ownerData?.avatar_url || property.owner?.avatar_url)}
+                  alt={(ownerData?.full_name || property.owner?.full_name || property.owner?.name || "Người dùng")}
                   sx={{ 
-                    mb: 2, 
-                    py: 1.8, 
-                    fontSize: '1.125rem', 
-                    fontWeight: 'bold',
-                    borderRadius: 2
+                    width: 80, 
+                    height: 80, 
+                    bgcolor: '#1976d2',
+                    border: '2px solid #f0f0f0',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    mb: 1
                   }}
-                  onClick={() => copyToClipboard(property.contact_info || property.owner?.phone || "")}
                 >
-                  {property.contact_info || property.owner?.phone || "0978 585 140"} • Sao chép
-                </Button>
-              )}
-              
-              {/* Chat Zalo button - like in the example */}
+                  {(ownerData?.full_name || property.owner?.full_name || property.owner?.name) ? 
+                    (ownerData?.full_name || property.owner?.full_name || property.owner?.name).charAt(0).toUpperCase() : "U"}
+                </Avatar>
+                
+                {/* Add user's full name */}
+                <Typography variant="h6" align="center" gutterBottom>
+                  {ownerData?.full_name || property.owner?.full_name || property.owner?.name || "Người dùng"}
+                </Typography>
+              </Box>
+
+              {/* Chat Zalo button */}
               <Button
                 fullWidth
                 variant="outlined"
@@ -628,19 +868,57 @@ const PropertyDetailPage: React.FC = () => {
                   py: 1.8,
                   borderRadius: 2,
                   fontWeight: 'medium',
-                  textTransform: 'none'
+                  textTransform: 'none',
+                  mb: 2,
+                  color: '#0068ff',
+                  borderColor: '#0068ff',
+                  '&:hover': {
+                    borderColor: '#0051cc',
+                    bgcolor: 'rgba(0,104,255,0.04)'
+                  }
                 }}
-                color="primary"
                 startIcon={
                   <Box
                     component="img"
-                    src="/img/zalo-icon.png"
+                    src="/img/icons/zalo-icon.png"
                     alt="Zalo"
                     sx={{ width: 24, height: 24 }}
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://stc-zaloprofile.zdn.vn/pc/v1/images/zalo_logo.svg';
+                    }}
                   />
                 }
               >
                 Chat qua Zalo
+              </Button>
+
+              {/* Phone number */}
+              <Button
+                fullWidth
+                variant="contained"
+                color="primary"
+                startIcon={<PhoneIcon />}
+                sx={{ 
+                  py: 1.8, 
+                  fontSize: '1.125rem', 
+                  fontWeight: 'bold',
+                  borderRadius: 2,
+                  bgcolor: '#154875',
+                  '&:hover': {
+                    bgcolor: '#0d325c'
+                  }
+                }}
+                onClick={() => {
+                  if (showFullPhone) {
+                    // Nếu đã hiển thị đầy đủ, copy số điện thoại
+                    copyToClipboard(ownerData?.phone || property.owner?.phone || property.contact_info || "");
+                  } else {
+                    // Nếu chưa hiển thị đầy đủ, hiện số đầy đủ
+                    setShowFullPhone(true);
+                  }
+                }}
+              >
+                {displayPhoneNumber(ownerData?.phone || property.owner?.phone || property.contact_info)}
               </Button>
             </Box>
           </Paper>
@@ -660,7 +938,9 @@ const PropertyDetailPage: React.FC = () => {
               </Box>
               
               <Typography variant="body2" sx={{ pl: 3.5 }}>
-                {property.ward && `${property.ward}, `}{property.district && `${property.district}, `}{property.city}
+                {locationNames.ward_name || property.ward ? `${locationNames.ward_name || property.ward}, ` : ''}
+                {locationNames.district_name || property.district ? `${locationNames.district_name || property.district}, ` : ''}
+                {locationNames.city_name || property.city}
               </Typography>
             </Box>
             

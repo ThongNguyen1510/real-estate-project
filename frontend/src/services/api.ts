@@ -83,8 +83,8 @@ export const authService = {
     const response = await api.post('/api/auth/forgot-password', { email });
     return response.data;
   },
-  resetPassword: async (token: string, password: string) => {
-    const response = await api.post('/api/auth/reset-password', { token, password });
+  resetPassword: async (token: string, new_password: string) => {
+    const response = await api.post('/api/auth/reset-password', { token, new_password });
     return response.data;
   },
   getProfile: async () => {
@@ -130,6 +130,12 @@ export const authService = {
 export const userService = {
   // Get user details
   getUserDetails: async (userId: number) => {
+    const response = await api.get(`/api/users/${userId}`);
+    return response.data;
+  },
+  
+  // Get user info by ID
+  getUserInfo: async (userId: number) => {
     const response = await api.get(`/api/users/${userId}`);
     return response.data;
   },

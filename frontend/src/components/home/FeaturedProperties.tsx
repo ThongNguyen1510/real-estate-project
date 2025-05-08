@@ -13,6 +13,7 @@ import {
 import { NavigateBefore, NavigateNext } from '@mui/icons-material';
 import PropertyCard from '../property/PropertyCard';
 import { propertyService } from '../../services/api';
+import { getLocationNames } from '../../services/api/locationService';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -47,6 +48,45 @@ const FeaturedProperties: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState<number[]>([]);
   
+  // Enrich properties with location names
+  const enrichPropertiesWithLocationNames = async (propertiesList: any[]) => {
+    if (!propertiesList || propertiesList.length === 0) return propertiesList;
+    
+    // Process all properties to add location names if missing
+    return await Promise.all(propertiesList.map(async (property) => {
+      // Skip processing if we already have location names
+      if (property.city_name && property.district_name && property.ward_name) {
+        return property;
+      }
+      
+      try {
+        // Fetch location names if they're missing
+        const locationResponse = await getLocationNames(
+          property.city || null,
+          property.district || null,
+          property.ward || null
+        );
+        
+        if (locationResponse.success && locationResponse.data) {
+          const { city_name, district_name, ward_name } = locationResponse.data;
+          
+          // Return property with additional location names
+          return {
+            ...property,
+            city_name: city_name || property.city || '',
+            district_name: district_name || property.district || '',
+            ward_name: ward_name || property.ward || ''
+          };
+        }
+      } catch (error) {
+        console.error('Error enriching property with location names:', error);
+      }
+      
+      // Return original property if location enrichment fails
+      return property;
+    }));
+  };
+  
   // Get real property data from API
   useEffect(() => {
     const fetchProperties = async () => {
@@ -60,7 +100,9 @@ const FeaturedProperties: React.FC = () => {
         
         if (response.success && response.data && response.data.properties) {
           console.log('Fetched properties:', response.data.properties);
-          setProperties(response.data.properties);
+          // Enrich properties with location names
+          const enrichedProperties = await enrichPropertiesWithLocationNames(response.data.properties);
+          setProperties(enrichedProperties);
         } else {
           console.error('Failed to fetch properties:', response);
           
@@ -71,14 +113,16 @@ const FeaturedProperties: React.FC = () => {
             const mockProperties = Array.from({ length: 8 }, (_, index) => ({
               id: index + 1,
               title: index % 2 === 0 ? `Căn hộ cao cấp ${index + 1} phòng ngủ` : `Nhà phố ${index + 1} tầng mặt tiền`,
-              price: 2000000000 + (index * 500000000),
+              price: index % 2 === 0 ? 500000000 + (index * 30000000) : 2000000000 + (index * 500000000),
               area: 50 + (index * 10),
               bedrooms: 1 + (index % 3),
               bathrooms: 1 + (index % 2),
               city: 'Hồ Chí Minh',
+              city_name: 'Hồ Chí Minh',
               district: index % 2 === 0 ? 'Quận 1' : 'Quận 2',
+              district_name: index % 2 === 0 ? 'Quận 1' : 'Quận 2',
               address: '123 Đường ABC',
-              status: index % 3 === 0 ? 'for_rent' : 'for_sale',
+              status: 'available',
               property_type: index % 3 === 0 ? 'apartment' : (index % 3 === 1 ? 'house' : 'villa'),
               image_url: `https://source.unsplash.com/featured/300x200?property,${index}`,
               primary_image_url: `https://source.unsplash.com/featured/300x200?property,${index}`
@@ -100,14 +144,16 @@ const FeaturedProperties: React.FC = () => {
           const mockProperties = Array.from({ length: 8 }, (_, index) => ({
             id: index + 1,
             title: index % 2 === 0 ? `Căn hộ cao cấp ${index + 1} phòng ngủ` : `Nhà phố ${index + 1} tầng mặt tiền`,
-            price: 2000000000 + (index * 500000000),
+            price: index % 2 === 0 ? 500000000 + (index * 30000000) : 2000000000 + (index * 500000000),
             area: 50 + (index * 10),
             bedrooms: 1 + (index % 3),
             bathrooms: 1 + (index % 2),
             city: 'Hồ Chí Minh',
+            city_name: 'Hồ Chí Minh',
             district: index % 2 === 0 ? 'Quận 1' : 'Quận 2',
+            district_name: index % 2 === 0 ? 'Quận 1' : 'Quận 2',
             address: '123 Đường ABC',
-            status: index % 3 === 0 ? 'for_rent' : 'for_sale',
+            status: 'available',
             property_type: index % 3 === 0 ? 'apartment' : (index % 3 === 1 ? 'house' : 'villa'),
             image_url: `https://source.unsplash.com/featured/300x200?property,${index}`,
             primary_image_url: `https://source.unsplash.com/featured/300x200?property,${index}`
@@ -148,8 +194,8 @@ const FeaturedProperties: React.FC = () => {
   // Filter properties based on active tab
   const filteredProperties = properties.filter(property => {
     if (activeTab === 0) return true; // All properties
-    if (activeTab === 1) return property.status === 'for_sale'; // For sale
-    if (activeTab === 2) return property.status === 'for_rent'; // For rent
+    if (activeTab === 1) return property.price >= 1000000000; // For sale (1 tỷ trở lên)
+    if (activeTab === 2) return property.price < 1000000000; // For rent (dưới 1 tỷ)
     return true;
   });
   

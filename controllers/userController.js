@@ -336,7 +336,7 @@ const forgotPassword = async (req, res) => {
             }
         });
 
-        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dat-lai-mat-khau?token=${resetToken}`;
         
         try {
         await transporter.sendMail({
@@ -506,7 +506,7 @@ const getUserProperties = async (req, res) => {
         const query = `
             SELECT 
                 p.id, p.title, p.price, p.area, p.property_type, p.status, 
-                p.created_at, p.primary_image_url,
+                p.created_at, p.primary_image_url, p.images,
                 l.address, l.district, l.city
             FROM 
                 Properties p
@@ -540,6 +540,28 @@ const getUserProperties = async (req, res) => {
                 listing_type = 'sale';
             }
             
+            // Xử lý hình ảnh
+            let imageUrls = [];
+            
+            // Thử parse JSON images nếu có
+            if (property.images) {
+                try {
+                    imageUrls = JSON.parse(property.images);
+                } catch (error) {
+                    console.error('Lỗi khi parse JSON images:', error);
+                }
+            }
+            
+            // Nếu không có ảnh từ trường images, sử dụng primary_image_url
+            if (!imageUrls || imageUrls.length === 0) {
+                if (property.primary_image_url) {
+                    imageUrls = [property.primary_image_url];
+                } else {
+                    // Ảnh mặc định nếu không có ảnh nào
+                    imageUrls = ['https://images.unsplash.com/photo-1580587771525-78b9dba3b914?q=80&w=1000&auto=format&fit=crop'];
+                }
+            }
+            
             return {
                 id: property.id,
                 title: property.title,
@@ -554,7 +576,8 @@ const getUserProperties = async (req, res) => {
                 district: property.district,
                 city: property.city,
                 created_at: property.created_at,
-                image_url: property.primary_image_url || 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?q=80&w=1000&auto=format&fit=crop'
+                images: imageUrls,
+                image_url: property.primary_image_url || (imageUrls.length > 0 ? imageUrls[0] : null)
             };
         });
         
@@ -585,9 +608,12 @@ const getUserProperties = async (req, res) => {
 const getPropertyTypeDisplay = (type) => {
     const typeMap = {
         'house': 'Nhà riêng',
+        'villa': 'Biệt thự',
         'apartment': 'Căn hộ chung cư',
         'land': 'Đất nền',
-        'commercial': 'Mặt bằng kinh doanh'
+        'commercial': 'Mặt bằng kinh doanh',
+        'office': 'Văn phòng',
+        'shop': 'Mặt bằng kinh doanh'
     };
     return typeMap[type] || type;
 };
@@ -612,22 +638,37 @@ const getUserFavorites = async (req, res) => {
     try {
         const userId = req.user.id;
         
-        const result = await sql.query`
+        // Tạo một request object
+        const request = new sql.Request();
+        request.input('userId', sql.Int, userId);
+        
+        // Query lấy đầy đủ thông tin
+        const query = `
             SELECT 
-                p.id, p.title, p.price, p.property_type, p.status, p.primary_image_url as thumbnail,
-                f.id as favorite_id, f.created_at as added_date
+                p.id, p.title, p.price, p.area, p.property_type, p.status, 
+                p.bedrooms, p.bathrooms, p.primary_image_url, p.images,
+                l.address, l.city, l.district, l.ward, l.street,
+                f.id as favorite_id, f.created_at as added_date,
+                u.name as owner_name, u.phone as owner_phone
             FROM 
                 Favorites f
             JOIN 
                 Properties p ON f.property_id = p.id
+            LEFT JOIN 
+                Locations l ON p.location_id = l.id
+            LEFT JOIN 
+                Users u ON p.owner_id = u.id
             WHERE 
-                f.user_id = ${userId}
+                f.user_id = @userId
             ORDER BY 
                 f.created_at DESC
         `;
         
-        // Map status to listing_type for backward compatibility
+        const result = await request.query(query);
+        
+        // Xử lý kết quả
         const favorites = result.recordset.map(property => {
+            // Xử lý trường listing_type
             let listing_type = 'sale';
             if (property.status === 'for_rent') {
                 listing_type = 'rent';
@@ -635,9 +676,35 @@ const getUserFavorites = async (req, res) => {
                 listing_type = 'sale';
             }
             
+            // Xử lý hình ảnh
+            let imageUrls = [];
+            
+            // Thử parse JSON images nếu có
+            if (property.images) {
+                try {
+                    imageUrls = JSON.parse(property.images);
+                } catch (error) {
+                    console.error('Lỗi khi parse JSON images:', error);
+                }
+            }
+            
+            // Nếu không có ảnh từ trường images, sử dụng primary_image_url
+            if (!imageUrls || imageUrls.length === 0) {
+                if (property.primary_image_url) {
+                    imageUrls = [property.primary_image_url];
+                } else {
+                    // Ảnh mặc định nếu không có ảnh nào
+                    imageUrls = ['https://images.unsplash.com/photo-1580587771525-78b9dba3b914?q=80&w=1000&auto=format&fit=crop'];
+                }
+            }
+            
+            // Format và trả về dữ liệu đầy đủ
             return {
                 ...property,
-                listing_type: listing_type
+                listing_type: listing_type,
+                image_url: property.primary_image_url || (imageUrls.length > 0 ? imageUrls[0] : null),
+                images: imageUrls,
+                full_address: `${property.address || ''}, ${property.district || ''}, ${property.city || ''}`.trim().replace(/^,\s*|,\s*$/g, '')
             };
         });
         
@@ -919,6 +986,41 @@ const updateAvatar = async (req, res) => {
     }
 };
 
+// Lấy thông tin người dùng theo ID
+const getUserById = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        console.log('Fetching user info for ID:', userId);
+        
+        const result = await sql.query`
+            SELECT id, username, name as full_name, email, phone, role, status, avatar_url, last_login, created_at
+            FROM Users 
+            WHERE id = ${userId}
+        `;
+        
+        if (result.recordset.length === 0) {
+            console.log('User not found for ID:', userId);
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy người dùng'
+            });
+        }
+
+        console.log('User data found:', result.recordset[0]);
+        res.status(200).json({
+            success: true,
+            data: result.recordset[0]
+        });
+    } catch (error) {
+        console.error('Lỗi lấy thông tin người dùng theo ID:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
@@ -942,5 +1044,6 @@ module.exports = {
     deleteAccount,
     addToFavorites,
     removeFromFavorites,
-    updateAvatar
+    updateAvatar,
+    getUserById
 };
