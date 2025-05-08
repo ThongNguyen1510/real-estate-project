@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Card, 
@@ -9,7 +9,8 @@ import {
   IconButton,
   Chip,
   Tooltip,
-  Grid
+  Grid,
+  CircularProgress
 } from '@mui/material';
 import {
   Favorite as FavoriteIcon,
@@ -20,6 +21,7 @@ import {
   LocationOn as LocationIcon
 } from '@mui/icons-material';
 import { formatPrice } from '../../utils/format';
+import { useFavorites } from '../../contexts/FavoritesContext';
 
 interface PropertyCardProps {
   property: {
@@ -27,7 +29,12 @@ interface PropertyCardProps {
     title: string;
     address?: string;
     city?: string;
+    city_name?: string;
     district?: string;
+    district_name?: string;
+    ward?: string;
+    ward_name?: string;
+    full_address?: string;
     price: number;
     area: number;
     bedrooms?: number;
@@ -38,17 +45,25 @@ interface PropertyCardProps {
     status?: string;
     property_type: string;
     isFavorite?: boolean;
+    listing_type?: string;
   };
   onFavoriteToggle?: (id: number) => void;
 }
 
 const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle }) => {
+  const [isToggling, setIsToggling] = useState(false);
+  
   const {
     id,
     title,
     address = '',
     city = '',
+    city_name = '',
     district = '',
+    district_name = '',
+    ward = '',
+    ward_name = '',
+    full_address,
     price,
     area,
     bedrooms = 0,
@@ -58,15 +73,40 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
     primary_image_url,
     status,
     property_type,
-    isFavorite = false
+    isFavorite = false,
+    listing_type
   } = property;
 
-  const handleFavoriteClick = (e: React.MouseEvent) => {
+  // Use the favorites context
+  const { toggleFavorite: contextToggleFavorite, isFavorite: checkIsFavorite } = useFavorites();
+
+  // Check if property is favorite from context or props
+  const isPropertyFavorite = isFavorite || checkIsFavorite(id);
+
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (onFavoriteToggle) {
-      onFavoriteToggle(id);
+    
+    if (isToggling) return;
+    
+    setIsToggling(true);
+    try {
+      // Use provided toggle function or context toggle function
+      if (onFavoriteToggle) {
+        await onFavoriteToggle(id);
+      } else {
+        await contextToggleFavorite(id);
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setIsToggling(false);
     }
+  };
+
+  const handleCardClick = () => {
+    // Scroll to top when card is clicked
+    window.scrollTo(0, 0);
   };
 
   const propertyTypeLabel = () => {
@@ -81,7 +121,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
         return 'Đất';
       case 'office':
         return 'Văn phòng';
-      case 'commercial':
+      case 'shop':
         return 'Mặt bằng KD';
       default:
         return property_type;
@@ -89,19 +129,58 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
   };
 
   // Determine transaction type from status
-  const isForSale = status === 'for_sale';
-  const isForRent = status === 'for_rent';
-  const transactionType = isForSale ? 'sale' : (isForRent ? 'rent' : 'sale');
-  const transactionTypeLabel = isForSale ? 'Bán' : (isForRent ? 'Cho thuê' : 'Bán');
+  const isForSale = status === 'for_sale' || listing_type === 'sale';
+  const isForRent = status === 'for_rent' || 
+                    status === 'rent' ||
+                    listing_type === 'rent' ||
+                    title.toLowerCase().includes('cho thuê') || 
+                    title.toLowerCase().includes('thuê') ||
+                    (property_type === 'office' && !title.toLowerCase().includes('bán'));
+  
+  // Priority order: listing_type > status > title contents
+  const transactionType = listing_type ? 
+                          (listing_type === 'rent' ? 'rent' : 'sale') : 
+                          (isForRent ? 'rent' : 'sale');
+  const transactionTypeLabel = transactionType === 'rent' ? 'Cho thuê' : 'Bán';
   
   // Determine the image to display (using priority)
   const imageUrl = primary_image_url || image_url || 
     (images && images.length > 0 ? images[0] : '/img/property/default.jpg');
 
+  // Format location for display
+  const formatLocation = () => {
+    if (full_address) return full_address;
+    
+    // Prefer names over codes
+    const districtDisplay = district_name || district;
+    const cityDisplay = city_name || city;
+    
+    if (address) {
+      if (districtDisplay && cityDisplay) {
+        return `${address}, ${districtDisplay}, ${cityDisplay}`;
+      } else if (districtDisplay) {
+        return `${address}, ${districtDisplay}`;
+      } else if (cityDisplay) {
+        return `${address}, ${cityDisplay}`;
+      } else {
+        return address;
+      }
+    } else if (districtDisplay && cityDisplay) {
+      return `${districtDisplay}, ${cityDisplay}`;
+    } else if (districtDisplay) {
+      return districtDisplay;
+    } else if (cityDisplay) {
+      return cityDisplay;
+    } else {
+      return 'Chưa có địa chỉ';
+    }
+  };
+
   return (
     <Card 
       component={Link} 
       to={`/bat-dong-san/${id}`}
+      onClick={handleCardClick}
       sx={{ 
         height: '100%',
         display: 'flex',
@@ -164,8 +243,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
             }
           }}
           size="small"
+          disabled={isToggling}
         >
-          {isFavorite ? (
+          {isToggling ? (
+            <CircularProgress size={16} color="inherit" />
+          ) : isPropertyFavorite ? (
             <FavoriteIcon color="error" fontSize="small" />
           ) : (
             <FavoriteBorderIcon color="action" fontSize="small" />
@@ -212,7 +294,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
               fontSize: '0.875rem'
             }}
           >
-            {district}, {city}
+            {formatLocation()}
           </Typography>
         </Box>
         
@@ -225,8 +307,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
             fontSize: '1.25rem'
           }}
         >
-          {formatPrice(price)}
-          {transactionType === 'rent' && '/tháng'}
+          {formatPrice(price, transactionType === 'rent')}
         </Typography>
         
         {/* Property attributes */}

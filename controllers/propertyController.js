@@ -48,6 +48,10 @@ async function getProperties(req, res) {
     // Build the WHERE clause based on filters
     let whereClause = 'WHERE 1=1';
 
+    // Luôn lọc bất động sản có status là available
+    whereClause += ' AND p.status = @status';
+    request.input('status', sql.NVarChar, 'available');
+
     if (req.query.property_type) {
       whereClause += ' AND p.property_type = @property_type';
       request.input('property_type', sql.NVarChar, req.query.property_type);
@@ -73,19 +77,27 @@ async function getProperties(req, res) {
       request.input('max_area', sql.Float, parseFloat(req.query.max_area));
     }
 
-    // Filter by status instead of listing_type if provided
+    // Filter by listing_type để phân biệt mua bán và cho thuê
     if (req.query.listing_type) {
-      // Map listing_type to status if needed or use separate status filter
-      const statusMap = {
-        'rent': 'for_rent',
-        'sale': 'for_sale'
-      };
-      const status = statusMap[req.query.listing_type] || req.query.listing_type;
-      whereClause += ' AND p.status = @status';
-      request.input('status', sql.NVarChar, status);
-    } else if (req.query.status) {
-      whereClause += ' AND p.status = @status';
-      request.input('status', sql.NVarChar, req.query.status);
+      console.log('Filtering by listing_type:', req.query.listing_type);
+      
+      // Trước tiên kiểm tra xem có trường listing_type trong DB không
+      if (req.query.listing_type === 'rent' || req.query.listing_type === 'sale') {
+        // Nếu có, lọc theo listing_type
+        whereClause += ' AND (p.listing_type = @listing_type';
+        request.input('listing_type', sql.NVarChar, req.query.listing_type);
+        
+        // Fallback: nếu listing_type là null, sử dụng giá để phân biệt
+        if (req.query.listing_type === 'rent') {
+          // Cho thuê: giá dưới 1 tỷ và không có listing_type hoặc listing_type là rent
+          whereClause += ' OR (p.listing_type IS NULL AND p.price < 1000000000))';
+          console.log('Filtering for RENTAL properties (listing_type = rent OR price < 1B when listing_type is NULL)');
+        } else {
+          // Bán: giá từ 1 tỷ trở lên và không có listing_type hoặc listing_type là sale
+          whereClause += ' OR (p.listing_type IS NULL AND p.price >= 1000000000))';
+          console.log('Filtering for SALE properties (listing_type = sale OR price >= 1B when listing_type is NULL)');
+        }
+      }
     }
 
     // Add pagination parameters
@@ -236,7 +248,7 @@ async function createProperty(req, res) {
   const { 
     title, description, price, area, property_type, bedrooms, 
     bathrooms, parking_slots, amenities, location, images, 
-    status 
+    status, listing_type
   } = req.body;
   
   try {
@@ -258,7 +270,7 @@ async function createProperty(req, res) {
     }
 
     // Validate property_type according to schema constraints
-    const validPropertyTypes = ['house', 'apartment', 'land', 'commercial'];
+    const validPropertyTypes = ['house', 'apartment', 'land', 'shop', 'villa', 'office'];
     
     // Log giá trị ban đầu để debug
     console.log("DEBUG - Received property_type:", property_type);
@@ -270,30 +282,30 @@ async function createProperty(req, res) {
       // Map tiếng Việt sang tiếng Anh
       const propertyTypeMap = {
         'nhà riêng': 'house',
-        'biệt thự': 'house',
+        'biệt thự': 'villa',
         'căn hộ chung cư': 'apartment',
         'chung cư': 'apartment',
         'căn hộ': 'apartment',
         'đất nền': 'land',
         'đất': 'land',
-        'văn phòng': 'commercial',
-        'mặt bằng kinh doanh': 'commercial',
-        'biệt thự': 'house',
-        'biet thu': 'house',
+        'văn phòng': 'office',
+        'mặt bằng kinh doanh': 'shop',
+        'biet thu': 'villa',
         // Thêm các giá trị trực tiếp từ UI
-        'Biệt thự': 'house', 
+        'Biệt thự': 'villa', 
         'Căn hộ chung cư': 'apartment',
         'Nhà riêng': 'house',
         'Đất nền': 'land',
-        'Văn phòng': 'commercial',
-        'Mặt bằng kinh doanh': 'commercial',
+        'Văn phòng': 'office',
+        'Mặt bằng kinh doanh': 'shop',
         // Thêm các giá trị tiếng Anh từ UI
-        'villa': 'house',
+        'villa': 'villa',
         'house': 'house',
         'apartment': 'apartment',
         'land': 'land',
-        'office': 'commercial',
-        'commercial': 'commercial'
+        'office': 'office',
+        'shop': 'shop',
+        'commercial': 'shop'  // Map commercial sang shop để tương thích
       };
       
       // Chuyển đổi sang chữ thường và loại bỏ dấu cách thừa
@@ -312,13 +324,15 @@ async function createProperty(req, res) {
       } else {
         // Fallback: Trực tiếp map giá trị cụ thể
         if (normalizedInput.includes('biệt thự') || normalizedInput.includes('biet thu') || normalizedInput.includes('villa')) {
-          normalizedPropertyType = 'house';
+          normalizedPropertyType = 'villa';
         } else if (normalizedInput.includes('căn hộ') || normalizedInput.includes('chung cư') || normalizedInput.includes('can ho') || normalizedInput.includes('apartment')) {
           normalizedPropertyType = 'apartment';
         } else if (normalizedInput.includes('đất') || normalizedInput.includes('dat') || normalizedInput.includes('land')) {
           normalizedPropertyType = 'land';
-        } else if (normalizedInput.includes('văn phòng') || normalizedInput.includes('thương mại') || normalizedInput.includes('kinh doanh') || normalizedInput.includes('office') || normalizedInput.includes('commercial')) {
-          normalizedPropertyType = 'commercial';
+        } else if (normalizedInput.includes('văn phòng') || normalizedInput.includes('office')) {
+          normalizedPropertyType = 'office';
+        } else if (normalizedInput.includes('thương mại') || normalizedInput.includes('kinh doanh') || normalizedInput.includes('commercial') || normalizedInput.includes('shop') || normalizedInput.includes('mặt bằng')) {
+          normalizedPropertyType = 'shop';
         }
           
         console.log("DEBUG - Fallback match applied:", normalizedPropertyType);
@@ -338,11 +352,37 @@ async function createProperty(req, res) {
       });
     }
 
-    // Validate status according to schema constraints
-    const validStatusTypes = ['available', 'rented', 'sold', 'maintenance'];
-    let propertyStatus = status || 'available';
-    if (status && !validStatusTypes.includes(status)) {
-      propertyStatus = 'available'; // Fallback to default if invalid
+    // Validate and normalize listing_type (for distinguishing between rent and sale)
+    let normalizedListingType = 'sale'; // Default to sale
+    
+    // If listing_type is explicitly provided and valid, use it
+    if (listing_type && ['rent', 'sale'].includes(listing_type.toLowerCase())) {
+      normalizedListingType = listing_type.toLowerCase();
+    } else {
+      // Otherwise determine from title and property type
+      const titleLower = title.toLowerCase();
+      
+      // Check for rental indicators in title
+      if (titleLower.includes('cho thuê') || 
+          titleLower.includes('thuê') || 
+          (property_type === 'office' && !titleLower.includes('bán'))) {
+        normalizedListingType = 'rent';
+      }
+      
+      // Double check with price if it's very low (likely rent)
+      if (price < 100000000) { // Less than 100 million VND
+        normalizedListingType = 'rent';
+      } else if (price >= 1000000000) { // 1 billion VND or more
+        normalizedListingType = 'sale';
+      }
+    }
+    
+    console.log('Determined listing_type:', normalizedListingType);
+    
+    // Make sure property status is valid
+    let propertyStatus = 'available';
+    if (status && ['available', 'pending', 'sold', 'rented'].includes(status)) {
+      propertyStatus = status;
     }
 
     // Xác thực người dùng
@@ -498,17 +538,18 @@ async function createProperty(req, res) {
       request.input('status', sql.NVarChar, propertyStatus); // Using validated status
       request.input('images', sql.NVarChar, imagesJson);
       request.input('primary_image_url', sql.NVarChar, primaryImageUrl);
+      request.input('listing_type', sql.NVarChar, normalizedListingType);
 
       const propertyQuery = `
         INSERT INTO Properties (
           title, description, price, area, property_type, bedrooms,
           bathrooms, parking_slots, amenities, owner_id, location_id,
-          status, images, primary_image_url
+          status, images, primary_image_url, listing_type
         )
         VALUES (
           @title, @description, @price, @area, @property_type,
           @bedrooms, @bathrooms, @parking_slots, @amenities,
-          @owner_id, @location_id, @status, @images, @primary_image_url
+          @owner_id, @location_id, @status, @images, @primary_image_url, @listing_type
         )
         SELECT SCOPE_IDENTITY() AS id
       `;
@@ -565,18 +606,19 @@ async function createProperty(req, res) {
 // Update a property
 async function updateProperty(req, res) {
   const { id } = req.params;
-  const { title, description, price, area, property_type, bedrooms, bathrooms, parking_slots, amenities, location, images, status } = req.body;
+  const { title, description, price, area, property_type, bedrooms, bathrooms, parking_slots, amenities, location, images, status, listing_type } = req.body;
   
   try {
     console.log('Updating property:', id);
     console.log('Request body:', req.body);
     console.log('Status value received:', status, 'Type:', typeof status);
+    console.log('Listing type received:', listing_type);
     
     const userId = req.user.id;
 
     // Kiểm tra quyền sở hữu
     const checkResult = await sql.query`
-      SELECT owner_id, status as current_status FROM Properties WHERE id = ${id}
+      SELECT owner_id, status as current_status, listing_type as current_listing_type FROM Properties WHERE id = ${id}
     `;
 
     if (checkResult.recordset.length === 0) {
@@ -593,9 +635,11 @@ async function updateProperty(req, res) {
       });
     }
 
-    // Current status from database
+    // Current status and listing_type from database
     const currentStatus = checkResult.recordset[0].current_status;
+    const currentListingType = checkResult.recordset[0].current_listing_type || (price >= 1000000000 ? 'sale' : 'rent');
     console.log('Current status in database:', currentStatus);
+    console.log('Current listing_type in database:', currentListingType);
 
     // Start a transaction
     const transaction = new sql.Transaction();
@@ -675,22 +719,76 @@ async function updateProperty(req, res) {
       }
       
       console.log('Final status to use:', validStatus);
+      
+      // Determine the appropriate listing_type based on various factors
+      let finalListingType = currentListingType;
+      
+      // Priority 1: Explicit listing_type provided in the request
+      if (listing_type && ['rent', 'sale'].includes(listing_type.toLowerCase())) {
+        finalListingType = listing_type.toLowerCase();
+        console.log('Using explicitly provided listing_type:', finalListingType);
+      } 
+      // Priority 2: Check title keywords (if title is being updated)
+      else if (title) {
+        const titleLower = title.toLowerCase();
+        if (titleLower.includes('cho thuê') || titleLower.includes('thuê')) {
+          finalListingType = 'rent';
+          console.log('Title contains rental keywords, setting listing_type to rent');
+        } else if (titleLower.includes('bán') && !titleLower.includes('thuê')) {
+          finalListingType = 'sale';
+          console.log('Title contains sale keywords, setting listing_type to sale');
+        }
+        // Special case for offices - they're often rental unless explicitly marked as for sale
+        else if (property_type === 'office' && !titleLower.includes('bán')) {
+          finalListingType = 'rent';
+          console.log('Property is office type without "bán" in title, setting listing_type to rent');
+        }
+      }
+      // Priority 3: Use price as indicator if being updated
+      else if (price !== undefined) {
+        if (price < 100000000) { // Less than 100 million VND - likely rent
+          finalListingType = 'rent';
+          console.log('Price is very low, setting listing_type to rent');
+        } else if (price >= 1000000000) { // 1 billion VND or more - likely sale
+          finalListingType = 'sale';
+          console.log('Price is high, setting listing_type to sale');
+        }
+      }
+      
+      console.log('Final determined listing_type:', finalListingType);
 
       // Cập nhật thông tin bất động sản
-      await request.query`
+      const updateQuery = `
         UPDATE Properties
-        SET title = ${title},
-            description = ${description},
-            price = ${price},
-            area = ${area},
-            property_type = ${property_type},
-            bedrooms = ${bedrooms},
-            bathrooms = ${bathrooms},
-            parking_slots = ${parking_slots},
-            amenities = ${amenities},
-            status = ${validStatus}
-        WHERE id = ${id}
+        SET title = @title,
+            description = @description,
+            price = @price,
+            area = @area,
+            property_type = @property_type,
+            bedrooms = @bedrooms,
+            bathrooms = @bathrooms,
+            parking_slots = @parking_slots,
+            amenities = @amenities,
+            status = @status,
+            listing_type = @listing_type
+        WHERE id = @id
+        SELECT SCOPE_IDENTITY() AS id
       `;
+      
+      request.input('title', sql.NVarChar, title);
+      request.input('description', sql.NVarChar, description);
+      request.input('price', sql.Decimal(18,2), price);
+      request.input('area', sql.Decimal(18,2), area);
+      request.input('property_type', sql.NVarChar, property_type);
+      request.input('bedrooms', sql.Int, bedrooms || null);
+      request.input('bathrooms', sql.Int, bathrooms || null);
+      request.input('parking_slots', sql.Int, parking_slots || null);
+      request.input('amenities', sql.NVarChar, amenities || null);
+      request.input('status', sql.NVarChar, validStatus);
+      request.input('listing_type', sql.NVarChar, finalListingType);
+      request.input('id', sql.Int, id);
+      
+      await request.query(updateQuery);
 
       // Cập nhật hình ảnh
       if (images && images.length > 0) {
@@ -776,29 +874,33 @@ async function deleteProperty(req, res) {
 // Advanced search properties
 async function searchProperties(req, res) {
   try {
-  const {
+    console.log('Search query params:', req.query);
+    
+    const {
       // Location filters
-    city,
-    district,
-    ward,
+      city,
+      city_name,
+      district,
+      ward,
       
       // Price range
-    price_min,
-    price_max,
+      price_min,
+      price_max,
       
       // Area range
-    area_min,
-    area_max,
+      area_min,
+      area_max,
       
       // Property details
-    bedrooms,
-    bathrooms,
-    property_type,
+      bedrooms,
+      bathrooms,
+      property_type,
       amenities,
       
       // Additional filters
       status,
       parking_slots,
+      listing_type,
       
       // Search text
       keyword,
@@ -810,7 +912,7 @@ async function searchProperties(req, res) {
       // Pagination
       page = 1,
       limit = 10
-  } = req.query;
+    } = req.query;
 
     // Create request object
     const request = new sql.Request();
@@ -824,6 +926,13 @@ async function searchProperties(req, res) {
     let whereClause = 'WHERE 1=1';
     let orderByClause = '';
 
+    // Listing type filter (sale or rent)
+    if (listing_type) {
+      whereClause += ' AND p.listing_type = @listing_type';
+      request.input('listing_type', sql.NVarChar, listing_type);
+      console.log('Filtering by listing_type:', listing_type);
+    }
+
     // Keyword search in title and description
     if (keyword) {
       whereClause += ` AND (
@@ -833,62 +942,91 @@ async function searchProperties(req, res) {
         OR l.street LIKE @keyword
       )`;
       request.input('keyword', sql.NVarChar, `%${keyword}%`);
+      console.log('Filtering by keyword:', keyword);
     }
 
     // Location filters
-    if (city) {
+    if (city_name) {
+      // If city_name is provided, use it (it contains the actual name like "Hồ Chí Minh")
+      whereClause += ' AND l.city = @city_name';
+      request.input('city_name', sql.NVarChar, city_name);
+      console.log('Filtering by city_name:', city_name);
+    } else if (city) {
+      // Fall back to city parameter if city_name is not provided
       whereClause += ' AND l.city = @city';
       request.input('city', sql.NVarChar, city);
+      console.log('Filtering by city:', city);
     }
+    
     if (district) {
       whereClause += ' AND l.district = @district';
       request.input('district', sql.NVarChar, district);
+      console.log('Filtering by district:', district);
     }
+    
     if (ward) {
       whereClause += ' AND l.ward = @ward';
       request.input('ward', sql.NVarChar, ward);
+      console.log('Filtering by ward:', ward);
     }
 
     // Price range
     if (price_min) {
       whereClause += ' AND p.price >= @price_min';
       request.input('price_min', sql.Decimal(18,2), parseFloat(price_min));
+      console.log('Filtering by price_min:', price_min);
     }
+    
     if (price_max) {
       whereClause += ' AND p.price <= @price_max';
       request.input('price_max', sql.Decimal(18,2), parseFloat(price_max));
+      console.log('Filtering by price_max:', price_max);
     }
 
     // Area range
     if (area_min) {
       whereClause += ' AND p.area >= @area_min';
       request.input('area_min', sql.Float, parseFloat(area_min));
+      console.log('Filtering by area_min:', area_min);
     }
+    
     if (area_max) {
       whereClause += ' AND p.area <= @area_max';
       request.input('area_max', sql.Float, parseFloat(area_max));
+      console.log('Filtering by area_max:', area_max);
     }
 
     // Property details
     if (bedrooms) {
-      whereClause += ' AND p.bedrooms = @bedrooms';
+      whereClause += ' AND p.bedrooms >= @bedrooms';
       request.input('bedrooms', sql.Int, parseInt(bedrooms));
+      console.log('Filtering by bedrooms:', bedrooms);
     }
+    
     if (bathrooms) {
-      whereClause += ' AND p.bathrooms = @bathrooms';
+      whereClause += ' AND p.bathrooms >= @bathrooms';
       request.input('bathrooms', sql.Int, parseInt(bathrooms));
+      console.log('Filtering by bathrooms:', bathrooms);
     }
+    
     if (property_type) {
       whereClause += ' AND p.property_type = @property_type';
       request.input('property_type', sql.NVarChar, property_type);
+      console.log('Filtering by property_type:', property_type);
     }
+    
     if (parking_slots) {
       whereClause += ' AND p.parking_slots >= @parking_slots';
       request.input('parking_slots', sql.Int, parseInt(parking_slots));
     }
+    
     if (status) {
       whereClause += ' AND p.status = @status';
       request.input('status', sql.NVarChar, status);
+    } else {
+      // Mặc định chỉ hiện bất động sản còn available
+      whereClause += ' AND p.status = @default_status';
+      request.input('default_status', sql.NVarChar, 'available');
     }
 
     // Amenities filter (multiple values possible)
@@ -912,6 +1050,8 @@ async function searchProperties(req, res) {
     
     orderByClause = ` ORDER BY p.${sortColumn} ${sortDir}`;
 
+    console.log('Where clause:', whereClause);
+
     // Get total count for pagination
     const countQuery = `
       SELECT COUNT(*) as total
@@ -932,20 +1072,10 @@ async function searchProperties(req, res) {
         l.address, l.city, l.district, l.ward, l.street, l.latitude, l.longitude,
         u.name as owner_name,
         (
-          SELECT STRING_AGG(image_url, ',')
-          FROM PropertyImages pi
-          WHERE pi.property_id = p.id
-        ) as images,
-        (
           SELECT COUNT(*) 
           FROM Favorites f 
           WHERE f.property_id = p.id
-        ) as favorite_count,
-        (
-          SELECT AVG(CAST(rating as FLOAT))
-          FROM Reviews r
-          WHERE r.property_id = p.id
-        ) as average_rating
+        ) as favorite_count
       FROM Properties p
       LEFT JOIN Locations l ON p.location_id = l.id
       LEFT JOIN Users u ON p.owner_id = u.id
@@ -955,19 +1085,33 @@ async function searchProperties(req, res) {
       FETCH NEXT @limit ROWS ONLY
     `;
 
+    console.log('Executing search query...');
     const result = await request.query(query);
+    console.log(`Found ${result.recordset.length} properties`);
 
     // Format the response
     res.json({
       success: true,
       message: 'Tìm kiếm bất động sản thành công',
       data: {
-        properties: result.recordset.map(property => ({
-          ...property,
-          images: property.images ? property.images.split(',') : [],
-          average_rating: property.average_rating || 0,
-          favorite_count: property.favorite_count || 0
-        })),
+        properties: result.recordset.map(property => {
+          // Parse images from JSON field
+          let imageArray = [];
+          try {
+            if (property.images) {
+              imageArray = JSON.parse(property.images);
+            }
+          } catch (error) {
+            console.error('Error parsing images JSON:', error);
+          }
+          
+          return {
+            ...property,
+            images: imageArray,
+            average_rating: 0, // Temporary until Reviews table is added
+            favorite_count: property.favorite_count || 0
+          };
+        }),
         pagination: {
           total,
           totalPages,
@@ -1063,7 +1207,7 @@ const getPropertyById = async (req, res) => {
   }
 }
 
-// Add property to favorites
+// Add or remove property from favorites (toggle)
 async function addToFavorites(req, res) {
   try {
     const { id } = req.params;
@@ -1087,25 +1231,36 @@ async function addToFavorites(req, res) {
       WHERE property_id = ${id} AND user_id = ${userId}
     `;
 
+    // If already in favorites, remove it
     if (favoriteCheck.recordset.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Bất động sản đã có trong danh sách yêu thích'
+      const favoriteId = favoriteCheck.recordset[0].id;
+      
+      // Remove from favorites
+      await sql.query`
+        DELETE FROM Favorites 
+        WHERE id = ${favoriteId}
+      `;
+
+      return res.json({
+        success: true,
+        message: 'Đã xóa khỏi danh sách yêu thích',
+        action: 'removed'
       });
     }
 
-    // Add to favorites
+    // Not in favorites, add it
     await sql.query`
-      INSERT INTO Favorites (property_id, user_id)
-      VALUES (${id}, ${userId})
+      INSERT INTO Favorites (property_id, user_id, created_at)
+      VALUES (${id}, ${userId}, GETDATE())
     `;
 
     res.status(201).json({
       success: true,
-      message: 'Đã thêm vào danh sách yêu thích'
+      message: 'Đã thêm vào danh sách yêu thích',
+      action: 'added'
     });
   } catch (error) {
-    console.error('Lỗi khi thêm vào yêu thích:', error);
+    console.error('Lỗi khi toggle yêu thích:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server',
@@ -1185,11 +1340,6 @@ async function getFavoriteProperties(req, res) {
           FROM Favorites f2 
           WHERE f2.property_id = p.id
         ) as favorite_count,
-        (
-          SELECT AVG(CAST(rating as FLOAT))
-          FROM Reviews r
-          WHERE r.property_id = p.id
-        ) as average_rating,
         f.created_at as favorited_at
       FROM Favorites f
       JOIN Properties p ON f.property_id = p.id
@@ -1220,7 +1370,7 @@ async function getFavoriteProperties(req, res) {
         ...property,
         images: imageArray,
         image_url: property.primary_image_url || 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?q=80&w=1000&auto=format&fit=crop',
-        average_rating: property.average_rating || 0,
+        average_rating: 0, // Temporary until Reviews table is added
         favorite_count: property.favorite_count || 0
       };
     });

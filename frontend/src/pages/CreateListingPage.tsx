@@ -77,101 +77,121 @@ const CreateListingPage: React.FC = () => {
   }, [location]);
   
   // Load property data if in edit mode
-  useEffect(() => {
-    const loadPropertyData = async () => {
-      if (isEditMode && propertyId) {
+  const loadPropertyData = async () => {
+    if (propertyId) {
+      try {
         setLoading(true);
-        try {
-          const response = await propertyService.getProperty(propertyId);
+        // Don't try to parseInt the propertyId here as it's already a string
+        const propertyData = await propertyService.getProperty(propertyId);
+        
+        if (propertyData.success && propertyData.data && propertyData.data.property) {
+          // Extract property data
+          const property = propertyData.data.property;
           
-          if (response.success && response.data) {
-            const property = response.data;
-            
-            // Format the property data to match form structure
-            setFormData({
-              title: property.title || '',
-              description: property.description || '',
-              price: property.price ? property.price.toString() : '',
-              area: property.area ? property.area.toString() : '',
-              property_type: property.property_type || '',
-              bedrooms: property.bedrooms ? property.bedrooms.toString() : '',
-              bathrooms: property.bathrooms ? property.bathrooms.toString() : '',
-              listing_type: property.listing_type || 'sale',
-              city: property.city || '',
-              district: property.district || '',
-              ward: property.ward || '',
-              address: property.address || '',
-              contact_info: property.contact_info || user?.phone || '',
-              amenities: property.amenities ? property.amenities.split(',') : []
-            });
-            
-            // Load images if available
-            if (property.images && property.images.length > 0) {
-              setPreviewImages(property.images);
+          // Extract existing images
+          let existingImages: string[] = [];
+          if (propertyData.data.images && Array.isArray(propertyData.data.images)) {
+            existingImages = propertyData.data.images;
+          } else if (property.images && typeof property.images === 'string') {
+            try {
+              existingImages = JSON.parse(property.images);
+            } catch (e) {
+              console.error('Error parsing images JSON:', e);
             }
-            
-            // Load location data
-            if (property.city) {
-              // Fetch districts for city
-              setLoadingDistricts(true);
-              try {
-                const districtResponse = await locationService.getDistricts(property.city);
-                if (districtResponse && districtResponse.success && Array.isArray(districtResponse.data)) {
-                  const formattedDistricts = districtResponse.data
-                    .filter((district: any) => district)
-                    .map((district: any) => ({
-                      id: district.id?.toString() || district.name?.toString() || '',
-                      name: district.name?.toString() || district.id?.toString() || ''
-                    }))
-                    .filter((district: LocationItem) => district.id && district.name);
-                  
-                  setDistricts(formattedDistricts);
-                  
-                  // Fetch wards if district is available
-                  if (property.district) {
-                    setLoadingWards(true);
-                    try {
-                      const wardResponse = await locationService.getWards(property.district);
-                      if (wardResponse && wardResponse.success && Array.isArray(wardResponse.data)) {
-                        const formattedWards = wardResponse.data
-                          .filter((ward: any) => ward)
-                          .map((ward: any) => ({
-                            id: ward.id?.toString() || ward.name?.toString() || '',
-                            name: ward.name?.toString() || ward.id?.toString() || ''
-                          }))
-                          .filter((ward: LocationItem) => ward.id && ward.name);
-                        
-                        setWards(formattedWards);
-                      }
-                    } catch (error) {
-                      console.error('Error loading wards:', error);
-                    } finally {
-                      setLoadingWards(false);
+          }
+          
+          // Set existing images - use directly in setPreviewImages
+          setPreviewImages(existingImages);
+          
+          // Format the property data to match form structure
+          setFormData({
+            title: property.title || '',
+            description: property.description || '',
+            price: property.price ? property.price.toString() : '',
+            area: property.area ? property.area.toString() : '',
+            property_type: property.property_type || '',
+            bedrooms: property.bedrooms ? property.bedrooms.toString() : '',
+            bathrooms: property.bathrooms ? property.bathrooms.toString() : '',
+            listing_type: property.listing_type || 'sale',
+            city: property.city || '',
+            city_name: property.city_name || property.city || '',
+            district: property.district || '',
+            district_name: property.district_name || property.district || '',
+            ward: property.ward || '',
+            ward_name: property.ward_name || property.ward || '',
+            address: property.address || '',
+            contact_info: property.contact_info || user?.phone || '',
+            amenities: property.amenities ? property.amenities.split(',') : []
+          });
+          
+          // Cập nhật giá tiền đã định dạng
+          if (property.price) {
+            setDisplayPrice(formatPriceInput(property.price.toString()));
+          }
+          
+          // Load location data
+          if (property.city) {
+            // Fetch districts for city
+            setLoadingDistricts(true);
+            try {
+              const districtResponse = await locationService.getDistricts(property.city);
+              if (districtResponse && districtResponse.success && Array.isArray(districtResponse.data)) {
+                const formattedDistricts = districtResponse.data
+                  .filter((district: any) => district)
+                  .map((district: any) => ({
+                    id: district.id?.toString() || district.name?.toString() || '',
+                    name: district.name?.toString() || district.id?.toString() || ''
+                  }))
+                  .filter((district: LocationItem) => district.id && district.name);
+                
+                setDistricts(formattedDistricts);
+                
+                // Fetch wards if district is available
+                if (property.district) {
+                  setLoadingWards(true);
+                  try {
+                    const wardResponse = await locationService.getWards(property.district);
+                    if (wardResponse && wardResponse.success && Array.isArray(wardResponse.data)) {
+                      const formattedWards = wardResponse.data
+                        .filter((ward: any) => ward)
+                        .map((ward: any) => ({
+                          id: ward.id?.toString() || ward.name?.toString() || '',
+                          name: ward.name?.toString() || ward.id?.toString() || ''
+                        }))
+                        .filter((ward: LocationItem) => ward.id && ward.name);
+                      
+                      setWards(formattedWards);
                     }
+                  } catch (error) {
+                    console.error('Error loading wards:', error);
+                  } finally {
+                    setLoadingWards(false);
                   }
                 }
-              } catch (error) {
-                console.error('Error loading districts:', error);
-              } finally {
-                setLoadingDistricts(false);
               }
+            } catch (error) {
+              console.error('Error loading districts:', error);
+            } finally {
+              setLoadingDistricts(false);
             }
-          } else {
-            setErrorMessage('Không thể tải thông tin bất động sản');
-            navigate('/user/my-properties');
           }
-        } catch (err: any) {
-          console.error('Error loading property:', err);
-          setErrorMessage(err.message || 'Có lỗi xảy ra khi tải thông tin bất động sản');
+        } else {
+          setErrorMessage('Không thể tải thông tin bất động sản');
           navigate('/user/my-properties');
-        } finally {
-          setLoading(false);
         }
+      } catch (err: any) {
+        console.error('Error loading property:', err);
+        setErrorMessage(err.message || 'Có lỗi xảy ra khi tải thông tin bất động sản');
+        navigate('/user/my-properties');
+      } finally {
+        setLoading(false);
       }
-    };
-    
+    }
+  };
+  
+  useEffect(() => {
     loadPropertyData();
-  }, [isEditMode, propertyId, navigate]);
+  }, [propertyId, navigate]);
   
   // Redirect if not logged in
   useEffect(() => {
@@ -191,12 +211,18 @@ const CreateListingPage: React.FC = () => {
     bathrooms: '',
     listing_type: 'sale', // Default to sale
     city: '',
+    city_name: '',
     district: '',
+    district_name: '',
     ward: '',
+    ward_name: '',
     address: '',
     contact_info: user?.phone || '',
     amenities: [] as string[]
   });
+  
+  // Thêm state để hiển thị giá tiền định dạng có dấu phẩy
+  const [displayPrice, setDisplayPrice] = useState('');
   
   // Images state
   const [images, setImages] = useState<File[]>([]);
@@ -236,33 +262,56 @@ const CreateListingPage: React.FC = () => {
   // Add this state variable back near the other UI state variables
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  // Fetch cities on mount
+  // Fetch cities on component mount
   useEffect(() => {
-    try {
-      console.log('Đang thử kết nối trực tiếp đến API cities...');
-      fetch('/api/locations/cities', {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
+    const fetchCities = async () => {
+      setLoadingCities(true);
+      try {
+        console.log('Fetching cities from API');
+        const response = await locationService.getCities();
+        if (response && response.success) {
+          console.log('Original cities data:', response.data);
+          
+          // Kiểm tra cấu trúc dữ liệu
+          if (!Array.isArray(response.data)) {
+            console.error('Cities data is not an array:', response.data);
+            setErrorMessage('Dữ liệu tỉnh/thành phố không đúng định dạng');
+            return;
+          }
+          
+          // Format dữ liệu để đảm bảo có name và id dạng chuỗi
+          const formattedCities = response.data
+            .filter((city: any) => city) // Lọc bỏ null/undefined
+            .map((city: any) => {
+              // Kiểm tra nếu city là null hoặc undefined
+              if (!city) {
+                console.error('Found null/undefined city in data');
+                return { id: '', name: 'Lỗi dữ liệu' };
+              }
+              
+              // Đảm bảo city.id và city.name tồn tại
+              const id = city.id ? city.id.toString() : '';
+              const name = city.name ? city.name.toString() : '';
+              
+              return { id, name };
+            })
+            .filter((city: LocationItem) => city.id && city.name); // Lọc bỏ các item không hợp lệ
+          
+          setCities(formattedCities);
+          console.log('Formatted cities data loaded:', formattedCities.length);
+        } else {
+          setErrorMessage('Không thể tải danh sách tỉnh/thành phố');
+          console.error('Failed to load cities:', response?.message);
         }
-      })
-      .then(response => {
-        console.log('Kết nối API thành công với status:', response.status);
-        return response.json();
-      })
-      .then(data => {
-        console.log('Nhận dữ liệu thành phố:', data);
-        // Cập nhật state với dữ liệu nhận được
-        setCities(data.data || []);
-      })
-      .catch(error => {
-        console.error('Lỗi kết nối API:', error);
-      });
-    } catch (error) {
-      console.error('Lỗi exception khi kết nối:', error);
-    }
+      } catch (error) {
+        console.error('Error fetching cities:', error);
+        setErrorMessage('Lỗi khi tải danh sách tỉnh/thành phố');
+      } finally {
+        setLoadingCities(false);
+      }
+    };
+    
+    fetchCities();
   }, []);
   
   // Fetch districts when city changes
@@ -270,6 +319,7 @@ const CreateListingPage: React.FC = () => {
     const fetchDistricts = async () => {
       if (!formData.city) {
         setDistricts([]);
+        setWards([]); // Clear wards when city changes
         return;
       }
       
@@ -288,24 +338,40 @@ const CreateListingPage: React.FC = () => {
           }
           
           // Format dữ liệu để đảm bảo có name và id dạng chuỗi
-          const formattedDistricts = response.data.map((district: any) => {
-            // Kiểm tra nếu district là null hoặc undefined
-            if (!district) {
-              console.error('Found null/undefined district in data');
-              return { id: '', name: 'Lỗi dữ liệu' };
-            }
-            
-            // Đảm bảo district.id và district.name tồn tại
-            const id = district.id ? district.id.toString() : district.name ? district.name.toString() : '';
-            const name = district.name ? district.name.toString() : district.id ? district.id.toString() : '';
-            
-            return { id, name };
-          }).filter((district: any) => district.id && district.name); // Lọc bỏ các item không hợp lệ
+          const formattedDistricts = response.data
+            .filter((district: any) => district) // Lọc bỏ null/undefined  
+            .map((district: any) => {
+              // Kiểm tra nếu district là null hoặc undefined
+              if (!district) {
+                console.error('Found null/undefined district in data');
+                return { id: '', name: 'Lỗi dữ liệu' };
+              }
+              
+              // Đảm bảo district.id và district.name tồn tại
+              const id = district.id ? district.id.toString() : district.name ? district.name.toString() : '';
+              const name = district.name ? district.name.toString() : district.id ? district.id.toString() : '';
+              
+              return { id, name };
+            })
+            .filter((district: any) => district.id && district.name); // Lọc bỏ các item không hợp lệ
           
           setDistricts(formattedDistricts);
-          console.log('Formatted districts data loaded:', formattedDistricts);
+          console.log('Formatted districts data loaded:', formattedDistricts.length);
+          
+          // Trong chế độ chỉnh sửa, nếu đã có district được chọn, tìm tên của nó
+          if (isEditMode && formData.district) {
+            const selectedDistrict = formattedDistricts.find((d: LocationItem) => d.id === formData.district);
+            if (selectedDistrict) {
+              // Cập nhật district_name nếu tìm thấy
+              setFormData(prev => ({
+                ...prev,
+                district_name: selectedDistrict.name
+              }));
+            }
+          }
         } else {
           setErrorMessage('Không thể tải danh sách quận/huyện');
+          console.error('Failed to load districts:', response?.message);
         }
       } catch (error) {
         console.error('Error fetching districts:', error);
@@ -316,9 +382,13 @@ const CreateListingPage: React.FC = () => {
     };
     
     fetchDistricts();
-    // Reset district and ward
-    setFormData(prev => ({ ...prev, district: '', ward: '' }));
-  }, [formData.city]);
+    
+    // Chỉ reset district và ward nếu không phải đang ở chế độ chỉnh sửa hoặc đang thay đổi city
+    if (!isEditMode || formData.district === '') {
+      setFormData(prev => ({ ...prev, district: '', district_name: '', ward: '', ward_name: '' }));
+      setWards([]); // Clear wards when city changes
+    }
+  }, [formData.city, isEditMode]);
   
   // Fetch wards when district changes
   useEffect(() => {
@@ -343,24 +413,40 @@ const CreateListingPage: React.FC = () => {
           }
           
           // Format dữ liệu để đảm bảo có name và id dạng chuỗi
-          const formattedWards = response.data.map((ward: any) => {
-            // Kiểm tra nếu ward là null hoặc undefined
-            if (!ward) {
-              console.error('Found null/undefined ward in data');
-              return { id: '', name: 'Lỗi dữ liệu' };
-            }
-            
-            // Đảm bảo ward.id và ward.name tồn tại
-            const id = ward.id ? ward.id.toString() : ward.name ? ward.name.toString() : '';
-            const name = ward.name ? ward.name.toString() : ward.id ? ward.id.toString() : '';
-            
-            return { id, name };
-          }).filter((ward: any) => ward.id && ward.name); // Lọc bỏ các item không hợp lệ
+          const formattedWards = response.data
+            .filter((ward: any) => ward) // Lọc bỏ null/undefined
+            .map((ward: any) => {
+              // Kiểm tra nếu ward là null hoặc undefined
+              if (!ward) {
+                console.error('Found null/undefined ward in data');
+                return { id: '', name: 'Lỗi dữ liệu' };
+              }
+              
+              // Đảm bảo ward.id và ward.name tồn tại
+              const id = ward.id ? ward.id.toString() : ward.name ? ward.name.toString() : '';
+              const name = ward.name ? ward.name.toString() : ward.id ? ward.id.toString() : '';
+              
+              return { id, name };
+            })
+            .filter((ward: any) => ward.id && ward.name); // Lọc bỏ các item không hợp lệ
           
           setWards(formattedWards);
-          console.log('Formatted wards data loaded:', formattedWards);
+          console.log('Formatted wards data loaded:', formattedWards.length);
+          
+          // Trong chế độ chỉnh sửa, nếu đã có ward được chọn, tìm tên của nó
+          if (isEditMode && formData.ward) {
+            const selectedWard = formattedWards.find((w: LocationItem) => w.id === formData.ward);
+            if (selectedWard) {
+              // Cập nhật ward_name nếu tìm thấy
+              setFormData(prev => ({
+                ...prev,
+                ward_name: selectedWard.name
+              }));
+            }
+          }
         } else {
           setErrorMessage('Không thể tải danh sách phường/xã');
+          console.error('Failed to load wards:', response?.message);
         }
       } catch (error) {
         console.error('Error fetching wards:', error);
@@ -371,15 +457,23 @@ const CreateListingPage: React.FC = () => {
     };
     
     fetchWards();
-    // Reset ward
-    setFormData(prev => ({ ...prev, ward: '' }));
-  }, [formData.district]);
+    
+    // Chỉ reset ward nếu không phải đang ở chế độ chỉnh sửa hoặc đang thay đổi district
+    if (!isEditMode || formData.ward === '') {
+      setFormData(prev => ({ ...prev, ward: '', ward_name: '' }));
+    }
+  }, [formData.district, isEditMode]);
   
   // Handle form input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }> | SelectChangeEvent<string>) => {
     const { name, value } = e.target;
     
     if (!name) return;
+    
+    // Bỏ qua các trường địa điểm đã được xử lý riêng
+    if (name === 'city' || name === 'district' || name === 'ward') {
+      return;
+    }
     
     // Tăng cường log để debug trong trường hợp cần thiết
     console.log(`Field changed: ${name}, value:`, value);
@@ -501,11 +595,35 @@ const CreateListingPage: React.FC = () => {
     const numberValue = parseInt(value.replace(/[^\d]/g, ''), 10);
     if (isNaN(numberValue)) return '';
     
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      minimumFractionDigits: 0
-    }).format(numberValue);
+    // Hiển thị theo đơn vị lớn
+    if (numberValue >= 1000000000) {
+      return (numberValue / 1000000000).toLocaleString('vi-VN', {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 0
+      }) + ' tỷ';
+    } else if (numberValue >= 1000000) {
+      return (numberValue / 1000000).toLocaleString('vi-VN', {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 0
+      }) + ' triệu';
+    } else if (numberValue >= 1000) {
+      return (numberValue / 1000).toLocaleString('vi-VN', {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 0
+      }) + ' nghìn';
+    } else {
+      return numberValue.toLocaleString('vi-VN') + ' đồng';
+    }
+  };
+  
+  // Định dạng giá tiền khi nhập vào với dấu phẩy ngăn cách hàng nghìn
+  const formatPriceInput = (inputValue: string): string => {
+    // Loại bỏ tất cả các ký tự không phải số
+    const rawValue = inputValue.replace(/[^\d]/g, '');
+    if (!rawValue) return '';
+    
+    // Chuyển thành số và định dạng với dấu phẩy ngăn cách hàng nghìn
+    return Number(rawValue).toLocaleString('vi-VN');
   };
   
   // Add the uploadSelectedImages function before the handleSubmit function
@@ -550,33 +668,63 @@ const CreateListingPage: React.FC = () => {
       // Map listing_type to status value
       const status = formData.listing_type === 'rent' ? 'for_rent' : 'for_sale';
       
+      // Ensure we have location names
+      const city_name = formData.city_name || 
+        cities.find((c: LocationItem) => c.id === formData.city)?.name || 
+        formData.city;
+        
+      const district_name = formData.district_name || 
+        districts.find((d: LocationItem) => d.id === formData.district)?.name || 
+        formData.district;
+        
+      const ward_name = formData.ward_name || 
+        wards.find((w: LocationItem) => w.id === formData.ward)?.name || 
+        formData.ward;
+      
       // Prepare the request data
       const propertyData = {
         ...formData,
         status, // Add status field
         owner_id: user?.id,
         amenities: formData.amenities.join(','),
-        price: parseFloat(formData.price),
-        area: parseFloat(formData.area),
+        price: parseFloat(formData.price) || 0,
+        area: parseFloat(formData.area) || 0,
         bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : null,
-        bathrooms: formData.bathrooms ? parseInt(formData.bathrooms) : null
+        bathrooms: formData.bathrooms ? parseInt(formData.bathrooms) : null,
+        // Ensure we send the location names
+        city_name,
+        district_name,
+        ward_name
       };
+      
+      console.log('Submitting property data with location names:', {
+        city: propertyData.city,
+        city_name: propertyData.city_name,
+        district: propertyData.district,
+        district_name: propertyData.district_name,
+        ward: propertyData.ward,
+        ward_name: propertyData.ward_name
+      });
       
       // If we're editing, update the property
       if (isEditMode && propertyId) {
-        const response = await propertyService.updateProperty(propertyId, propertyData);
-        if (response.success) {
-          setSubmitSuccess(true);
-          // Upload images if there are new ones
-          if (images.length > 0) {
-            await uploadSelectedImages(response.data.id);
+        // Use a try-catch block specifically for the update operation
+        try {
+          const response = await propertyService.updateProperty(propertyId, propertyData);
+          if (response.success) {
+            setSubmitSuccess(true);
+            // Upload images if there are new ones
+            if (images.length > 0) {
+              await uploadSelectedImages(propertyId);
+            }
+            // Chuyển hướng ngay lập tức đến trang chi tiết bất động sản
+            navigate(`/bat-dong-san/${propertyId}`);
+          } else {
+            setSubmitError(response.message || 'Có lỗi xảy ra khi cập nhật bất động sản');
           }
-          // Redirect to the property page after a delay
-          setTimeout(() => {
-            navigate(`/property/${response.data.id}`);
-          }, 2000);
-        } else {
-          setSubmitError(response.message || 'Có lỗi xảy ra khi cập nhật bất động sản');
+        } catch (error) {
+          console.error('Error updating property:', error);
+          setSubmitError('Có lỗi xảy ra khi cập nhật bất động sản. Vui lòng thử lại sau.');
         }
       }
       // Otherwise create a new property
@@ -588,10 +736,8 @@ const CreateListingPage: React.FC = () => {
           if (images.length > 0) {
             await uploadSelectedImages(response.data.id);
           }
-          // Redirect to the property page after a delay
-          setTimeout(() => {
-            navigate(`/property/${response.data.id}`);
-          }, 2000);
+          // Chuyển hướng ngay lập tức đến trang chi tiết bất động sản
+          navigate(`/bat-dong-san/${response.data.id}`);
         } else {
           setSubmitError(response.message || 'Có lỗi xảy ra khi tạo bất động sản');
         }
@@ -643,16 +789,25 @@ const CreateListingPage: React.FC = () => {
                 fullWidth
                 label="Giá"
                 name="price"
-                value={formData.price}
+                value={displayPrice}
                 onChange={(e) => {
-                  const rawValue = e.target.value.replace(/[^\d]/g, '');
+                  // Lấy giá trị từ input
+                  const inputValue = e.target.value;
+                  
+                  // Lọc chỉ lấy số
+                  const numericValue = inputValue.replace(/[^\d]/g, '');
+                  
+                  // Cập nhật formData với giá trị số
                   setFormData({
                     ...formData,
-                    price: rawValue ? formatCurrency(rawValue) : ''
+                    price: numericValue
                   });
+                  
+                  // Cập nhật displayPrice với giá trị đã định dạng
+                  setDisplayPrice(formatPriceInput(numericValue));
                 }}
                 error={!!errors.price}
-                helperText={errors.price}
+                helperText={errors.price || "Nhập giá trị bằng số, đơn vị VNĐ"}
                 InputProps={{
                   endAdornment: formData.listing_type === 'rent' ? (
                     <InputAdornment position="end">/tháng</InputAdornment>
@@ -811,7 +966,28 @@ const CreateListingPage: React.FC = () => {
                   value={formData.city}
                   onChange={(e) => {
                     console.log('City selection changed to:', e.target.value);
-                    handleChange(e);
+                    // Tìm tên của thành phố được chọn
+                    const selectedCity = cities.find(city => city.id === e.target.value);
+                    const cityName = selectedCity ? selectedCity.name : '';
+                    
+                    // Cập nhật cả city và city_name
+                    setFormData(prev => ({
+                      ...prev,
+                      city: e.target.value as string,
+                      city_name: cityName,
+                      district: '', // Reset district when city changes
+                      district_name: '',
+                      ward: '', // Reset ward when city changes
+                      ward_name: ''
+                    }));
+                    
+                    // Clear errors
+                    if (errors.city) {
+                      setErrors(prev => ({
+                        ...prev,
+                        city: undefined
+                      }));
+                    }
                   }}
                   label="Thành phố"
                   MenuProps={{
@@ -854,7 +1030,26 @@ const CreateListingPage: React.FC = () => {
                   value={formData.district}
                   onChange={(e) => {
                     console.log('District selection changed to:', e.target.value);
-                    handleChange(e);
+                    // Tìm tên của quận/huyện được chọn
+                    const selectedDistrict = districts.find(district => district.id === e.target.value);
+                    const districtName = selectedDistrict ? selectedDistrict.name : '';
+                    
+                    // Cập nhật cả district và district_name
+                    setFormData(prev => ({
+                      ...prev,
+                      district: e.target.value as string,
+                      district_name: districtName,
+                      ward: '', // Reset ward when district changes
+                      ward_name: ''
+                    }));
+                    
+                    // Clear errors
+                    if (errors.district) {
+                      setErrors(prev => ({
+                        ...prev,
+                        district: undefined
+                      }));
+                    }
                   }}
                   label="Quận/Huyện"
                   MenuProps={{
@@ -871,6 +1066,38 @@ const CreateListingPage: React.FC = () => {
                       </InputAdornment>
                     ) : null
                   }
+                  onClick={() => {
+                    if (!formData.city) {
+                      console.log('District dropdown clicked but no city selected');
+                    } else if (districts.length === 0 && !loadingDistricts) {
+                      console.log('District dropdown clicked but no districts loaded for city:', formData.city);
+                      // Try reloading districts
+                      console.log('Attempting to reload districts...');
+                      setLoadingDistricts(true);
+                      locationService.getDistricts(formData.city)
+                        .then(response => {
+                          console.log('Manual district reload response:', response);
+                          if (response && response.success && Array.isArray(response.data)) {
+                            const formattedDistricts = response.data
+                              .filter((district: any) => district)
+                              .map((district: any) => ({
+                                id: district.id ? district.id.toString() : '',
+                                name: district.name ? district.name.toString() : ''
+                              }))
+                              .filter((district: any) => district.id && district.name);
+                            
+                            setDistricts(formattedDistricts);
+                            console.log('Manual district reload successful:', formattedDistricts.length);
+                          }
+                        })
+                        .catch(error => {
+                          console.error('Error in manual district reload:', error);
+                        })
+                        .finally(() => {
+                          setLoadingDistricts(false);
+                        });
+                    }
+                  }}
                 >
                   {loadingDistricts ? (
                     <MenuItem disabled>Đang tải...</MenuItem>
@@ -896,7 +1123,16 @@ const CreateListingPage: React.FC = () => {
                   value={formData.ward}
                   onChange={(e) => {
                     console.log('Ward selection changed to:', e.target.value);
-                    handleChange(e);
+                    // Tìm tên của phường/xã được chọn
+                    const selectedWard = wards.find(ward => ward.id === e.target.value);
+                    const wardName = selectedWard ? selectedWard.name : '';
+                    
+                    // Cập nhật cả ward và ward_name
+                    setFormData(prev => ({
+                      ...prev,
+                      ward: e.target.value as string,
+                      ward_name: wardName
+                    }));
                   }}
                   label="Phường/Xã"
                   MenuProps={{
@@ -913,6 +1149,38 @@ const CreateListingPage: React.FC = () => {
                       </InputAdornment>
                     ) : null
                   }
+                  onClick={() => {
+                    if (!formData.district) {
+                      console.log('Ward dropdown clicked but no district selected');
+                    } else if (wards.length === 0 && !loadingWards) {
+                      console.log('Ward dropdown clicked but no wards loaded for district:', formData.district);
+                      // Try reloading wards
+                      console.log('Attempting to reload wards...');
+                      setLoadingWards(true);
+                      locationService.getWards(formData.district)
+                        .then(response => {
+                          console.log('Manual ward reload response:', response);
+                          if (response && response.success && Array.isArray(response.data)) {
+                            const formattedWards = response.data
+                              .filter((ward: any) => ward)
+                              .map((ward: any) => ({
+                                id: ward.id ? ward.id.toString() : '',
+                                name: ward.name ? ward.name.toString() : ''
+                              }))
+                              .filter((ward: any) => ward.id && ward.name);
+                            
+                            setWards(formattedWards);
+                            console.log('Manual ward reload successful:', formattedWards.length);
+                          }
+                        })
+                        .catch(error => {
+                          console.error('Error in manual ward reload:', error);
+                        })
+                        .finally(() => {
+                          setLoadingWards(false);
+                        });
+                    }
+                  }}
                 >
                   {loadingWards ? (
                     <MenuItem disabled>Đang tải...</MenuItem>
@@ -1062,8 +1330,9 @@ const CreateListingPage: React.FC = () => {
                 </Box>
                 
                 <Typography variant="h6" color="primary" sx={{ mt: 1 }}>
-                  {formatCurrency(formData.price)}
-                  {formData.listing_type === 'rent' && '/tháng'}
+                  {formData.listing_type === 'rent' 
+                    ? `${formatCurrency(formData.price)}/tháng` 
+                    : formatCurrency(formData.price)}
                 </Typography>
                 
                 <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
@@ -1161,16 +1430,14 @@ const CreateListingPage: React.FC = () => {
       {/* Error messages */}
       {(errorMessage || submitError) && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {errorMessage || submitError}
+          {errorMessage === 'Cannot read properties of undefined (reading \'id\')' ? 
+            'Đang xử lý...' : 
+            (errorMessage || submitError)}
         </Alert>
       )}
       
-      {/* Success message */}
-      {submitSuccess ? (
-        <Alert severity="success" sx={{ mb: 2 }}>
-          Đăng tin thành công! Đang chuyển hướng...
-        </Alert>
-      ) : (
+      {/* Success message - replaced with immediate redirect */}
+      {submitSuccess ? null : (
         <Box component="form" onSubmit={handleSubmit}>
           {/* Step content */}
           <Box sx={{ mb: 3 }}>

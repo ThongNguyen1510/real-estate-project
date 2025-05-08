@@ -66,7 +66,7 @@ const propertiesRoutes = require("./routes/propertiesRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 
 app.use("/api/auth", userRoutes);
-app.use("/api/properties", authenticateToken, propertiesRoutes);
+app.use("/api/properties", propertiesRoutes);
 app.use("/api/locations", locationRoutes);
 
 // Kiểm tra route gốc

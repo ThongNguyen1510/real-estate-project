@@ -5,7 +5,8 @@ const {
     listDistricts,
     listWards,
     searchLocation,
-    getLocation
+    getLocation,
+    getLocationNamesByIds
 } = require('../controllers/locationController');
 
 // Disable caching for all location routes
@@ -33,6 +34,9 @@ router.get('/districts/:city', listDistricts);
 
 // Lấy danh sách phường/xã theo quận/huyện
 router.get('/wards/:district', listWards);
+
+// Lấy tên địa điểm theo ID
+router.get('/names', getLocationNamesByIds);
 
 // Tìm kiếm địa điểm
 router.get('/search', searchLocation);

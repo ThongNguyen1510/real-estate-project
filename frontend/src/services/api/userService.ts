@@ -73,13 +73,17 @@ export const updateProperty = async (propertyId: number, data: any) => {
 };
 
 // Lấy danh sách các bất động sản yêu thích
-export const getFavorites = async (page = 1, limit = 10) => {
+export const getFavorites = async (page?: number, limit?: number) => {
   try {
-    const response = await axios.get(`${API_URL}/auth/favorites`, {
+    const params: Record<string, any> = {};
+    if (page) params.page = page;
+    if (limit) params.limit = limit;
+
+    const response = await axios.get(`${API_URL}/users/favorites`, {
       headers: {
         Authorization: `Bearer ${getAccessToken()}`
       },
-      params: { page, limit }
+      params
     });
     return response.data;
   } catch (error: any) {
@@ -175,6 +179,71 @@ export const changePassword = async (data: { current_password: string, new_passw
   }
 };
 
+// Lấy thông tin người dùng theo ID
+export const getUserInfo = async (userId: number) => {
+  try {
+    const response = await axios.get(`${API_URL}/users/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${getAccessToken()}`
+      }
+    });
+    return response.data;
+  } catch (error: any) {
+    if (error.response) {
+      return error.response.data;
+    }
+    return { success: false, message: error.message };
+  }
+};
+
+// Get user profile
+export const getProfile = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/users/profile`, {
+      headers: {
+        Authorization: `Bearer ${getAccessToken()}`
+      }
+    });
+    return response.data;
+  } catch (error: any) {
+    if (error.response) {
+      return error.response.data;
+    }
+    return { success: false, message: error.message };
+  }
+};
+
+// Update user avatar
+export const updateAvatar = async (formData: FormData) => {
+  try {
+    const response = await axios.post(`${API_URL}/users/avatar`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Authorization: `Bearer ${getAccessToken()}`
+      }
+    });
+    return response.data;
+  } catch (error: any) {
+    if (error.response) {
+      return error.response.data;
+    }
+    return { success: false, message: error.message };
+  }
+};
+
+// Get user by ID
+export const getUserById = async (id: number) => {
+  try {
+    const response = await axios.get(`${API_URL}/users/${id}`);
+    return response.data;
+  } catch (error: any) {
+    if (error.response) {
+      return error.response.data;
+    }
+    return { success: false, message: error.message };
+  }
+};
+
 export default {
   getProperties,
   deleteProperty,
@@ -185,5 +254,9 @@ export default {
   removeFromFavorites,
   getUserProfile,
   updateProfile,
-  changePassword
+  changePassword,
+  getUserInfo,
+  getProfile,
+  updateAvatar,
+  getUserById
 }; 

@@ -120,7 +120,29 @@ const LoginPage: React.FC = () => {
       navigate('/');
     } catch (err: any) {
       console.error('Login error:', err);
-      setError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.');
+      
+      // Hiển thị lỗi cụ thể cho từng trường
+      const errorMessage = err.message.toLowerCase();
+      
+      if (errorMessage.includes('username') || 
+          errorMessage.includes('email') || 
+          errorMessage.includes('tài khoản')) {
+        setValidationErrors(prev => ({
+          ...prev,
+          email: 'Tên đăng nhập hoặc email không chính xác'
+        }));
+      }
+      
+      if (errorMessage.includes('mật khẩu') || 
+          errorMessage.includes('password')) {
+        setValidationErrors(prev => ({
+          ...prev,
+          password: 'Mật khẩu không chính xác'
+        }));
+      }
+      
+      // Hiển thị thông báo lỗi chung
+      setError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin đăng nhập.');
     } finally {
       setLoading(false);
     }
@@ -140,12 +162,18 @@ const LoginPage: React.FC = () => {
           </Box>
           
           {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
+            <Alert 
+              severity="error" 
+              sx={{ 
+                mb: 3, 
+                '& .MuiAlert-message': { fontSize: '0.9rem' } 
+              }}
+            >
               {error}
             </Alert>
           )}
           
-          <Box component="form" onSubmit={handleSubmit}>
+          <Box component="form" onSubmit={handleSubmit} noValidate>
             <TextField
               fullWidth
               margin="normal"

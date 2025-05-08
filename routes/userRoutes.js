@@ -50,7 +50,7 @@ router.post("/verify-email", userController.verifyEmail);
 // Profile routes (authentication required)
 router.get("/profile", auth, userController.getUserProfile);
 router.put("/profile", auth, userController.updateUserProfile);
-router.put("/change-password", auth, userController.changePassword);
+router.post("/changePassword", auth, userController.changePassword);
 router.delete("/profile", auth, userController.deleteAccount);
 
 // Avatar route (authentication required)
@@ -121,5 +121,8 @@ router.put("/notifications/settings", auth, userController.updateNotificationSet
 
 // Logout (authentication required)
 router.post("/logout", auth, userController.logout);
+
+// Thêm route lấy thông tin người dùng theo ID
+router.get("/:id", userController.getUserById);
 
 module.exports = router;

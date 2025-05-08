@@ -3,7 +3,8 @@ const {
     getDistricts,
     getWards,
     searchLocations,
-    getLocationDetail
+    getLocationDetail,
+    getLocationNames
 } = require('../models/locationModel');
 
 // Lấy danh sách thành phố
@@ -121,10 +122,39 @@ const getLocation = async (req, res) => {
     }
 };
 
+// Lấy tên địa điểm từ ID
+const getLocationNamesByIds = async (req, res) => {
+    try {
+        const { cityId, districtId, wardId } = req.query;
+        console.log('Controller: Getting location names for IDs:', { cityId, districtId, wardId });
+        
+        if (!cityId && !districtId && !wardId) {
+            return res.status(400).json({
+                success: false,
+                message: 'No location IDs provided'
+            });
+        }
+        
+        const locationNames = await getLocationNames(cityId, districtId, wardId);
+        
+        res.json({
+            success: true,
+            data: locationNames
+        });
+    } catch (error) {
+        console.error('Error getting location names:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while getting location names'
+        });
+    }
+};
+
 module.exports = {
     listCities,
     listDistricts,
     listWards,
     searchLocation,
-    getLocation
+    getLocation,
+    getLocationNamesByIds
 }; 

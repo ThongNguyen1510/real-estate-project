@@ -45,6 +45,7 @@ import {
   Flag as FlagIcon
 } from '@mui/icons-material';
 import { userService, propertyService } from '../../services/api';
+import { getLocationNames } from '../../services/api/locationService';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDate, formatPrice } from '../../utils/format';
 
@@ -64,9 +65,13 @@ interface Property {
   created_at: string;
   address: string;
   city: string;
+  city_name?: string;
   district: string;
-  ward: string;
+  district_name?: string;
+  ward?: string;
+  ward_name?: string;
   images: string[];
+  image_url?: string;
 }
 
 // Tab interface for statuses
@@ -147,6 +152,45 @@ const MyProperties = () => {
     }
   }, [tabValue, properties]);
   
+  // Enrich properties with location names
+  const enrichPropertiesWithLocationNames = async (propertiesList: Property[]) => {
+    if (!propertiesList || propertiesList.length === 0) return propertiesList;
+    
+    // Process all properties to add location names if missing
+    return await Promise.all(propertiesList.map(async (property) => {
+      // Skip processing if we already have location names
+      if (property.city_name && property.district_name) {
+        return property;
+      }
+      
+      try {
+        // Fetch location names if they're missing
+        const locationResponse = await getLocationNames(
+          property.city || null,
+          property.district || null,
+          property.ward || null
+        );
+        
+        if (locationResponse.success && locationResponse.data) {
+          const { city_name, district_name, ward_name } = locationResponse.data;
+          
+          // Return property with additional location names
+          return {
+            ...property,
+            city_name: city_name || property.city || '',
+            district_name: district_name || property.district || '',
+            ward_name: ward_name || property.ward || ''
+          };
+        }
+      } catch (error) {
+        console.error('Error enriching property with location names:', error);
+      }
+      
+      // Return original property if location enrichment fails
+      return property;
+    }));
+  };
+  
   // Fetch user properties
   useEffect(() => {
     if (!isAuthenticated) {
@@ -165,8 +209,12 @@ const MyProperties = () => {
       const response = await userService.getUserProperties({ page, limit });
       
       if (response.success) {
-        setProperties(response.data.properties);
-        setFilteredProperties(response.data.properties);
+        // Enrich properties with location names
+        const propertiesData = response.data.properties || [];
+        const enrichedProperties = await enrichPropertiesWithLocationNames(propertiesData);
+        
+        setProperties(enrichedProperties);
+        setFilteredProperties(enrichedProperties);
         setTotalPages(response.data.pagination.totalPages);
       } else {
         setError(response.message || 'Không thể tải danh sách bất động sản');
@@ -263,6 +311,31 @@ const MyProperties = () => {
       </TableCell>
     </TableRow>
   );
+  
+  // Format location display
+  const formatLocation = (property: Property) => {
+    const city = property.city_name || property.city || '';
+    const district = property.district_name || property.district || '';
+    const address = property.address || '';
+    
+    if (address && district && city) {
+      return `${address}, ${district}, ${city}`;
+    } else if (address && district) {
+      return `${address}, ${district}`;
+    } else if (address && city) {
+      return `${address}, ${city}`;
+    } else if (district && city) {
+      return `${district}, ${city}`;
+    } else if (address) {
+      return address;
+    } else if (district) {
+      return district;
+    } else if (city) {
+      return city;
+    }
+    
+    return 'Không có địa chỉ';
+  };
   
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -430,7 +503,7 @@ const MyProperties = () => {
                         component="img"
                         src={property.images && property.images.length > 0 
                           ? property.images[0] 
-                          : '/img/placeholder.jpg'}
+                          : property.image_url || '/img/placeholder.jpg'}
                         alt={property.title}
                         sx={{ 
                           width: 60, 
@@ -440,6 +513,10 @@ const MyProperties = () => {
                           mr: 2,
                           border: '1px solid',
                           borderColor: 'divider'
+                        }}
+                        onError={(e) => {
+                          // Fallback to default image if property image fails to load
+                          e.currentTarget.src = '/img/placeholder.jpg';
                         }}
                       />
                       <Box>
@@ -453,12 +530,7 @@ const MyProperties = () => {
                     </Box>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-                      {property.address}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {property.district}, {property.city}
-                    </Typography>
+                    {formatLocation(property)}
                   </TableCell>
                   <TableCell align="center">
                     <Typography variant="body1" color="primary" fontWeight="bold">

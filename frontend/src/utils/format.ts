@@ -1,27 +1,41 @@
 /**
  * Format a number as Vietnamese currency (VND)
  * @param price - The price to format
+ * @param isRent - Whether this is a rental price (to show /month)
  * @returns Formatted price string
  */
-export const formatPrice = (price: number): string => {
+export const formatPrice = (price: number, isRent: boolean = false): string => {
   // Handle edge cases
   if (price === 0) return '0 đ';
   if (!price) return 'Giá thỏa thuận';
   
   // Format to Vietnamese currency with billion/million abbreviations
+  let formattedPrice = '';
   if (price >= 1000000000) {
-    return (price / 1000000000).toLocaleString('vi-VN', { 
+    formattedPrice = (price / 1000000000).toLocaleString('vi-VN', { 
       maximumFractionDigits: 2, 
       minimumFractionDigits: 0 
     }) + ' tỷ';
   } else if (price >= 1000000) {
-    return (price / 1000000).toLocaleString('vi-VN', { 
+    formattedPrice = (price / 1000000).toLocaleString('vi-VN', { 
       maximumFractionDigits: 2, 
       minimumFractionDigits: 0 
     }) + ' triệu';
+  } else if (price >= 1000) {
+    formattedPrice = (price / 1000).toLocaleString('vi-VN', { 
+      maximumFractionDigits: 2, 
+      minimumFractionDigits: 0
+    }) + ' nghìn';
   } else {
-    return price.toLocaleString('vi-VN') + ' đ';
+    formattedPrice = price.toLocaleString('vi-VN') + ' đồng';
   }
+  
+  // Add "/tháng" suffix for rental properties if specified
+  if (isRent) {
+    formattedPrice += '/tháng';
+  }
+  
+  return formattedPrice;
 };
 
 /**

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   AppBar, 
   Toolbar, 
@@ -13,7 +13,8 @@ import {
   Badge,
   Avatar,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  Divider
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -25,7 +26,8 @@ import {
   Info as InfoIcon,
   ContactSupport as ContactIcon,
   Article as NewsIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  Dashboard as DashboardIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -33,6 +35,7 @@ const Header: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
+  const location = useLocation();
   
   const { isAuthenticated, user, logout } = useAuth();
   
@@ -87,6 +90,7 @@ const Header: React.FC = () => {
     
     console.log('Header - Rendering avatar for user:', user.name);
     console.log('Header - Avatar path from user object:', user.avatar);
+    console.log('Header - User role:', user.role);
     
     const timestamp = new Date().getTime();
     
@@ -98,7 +102,7 @@ const Header: React.FC = () => {
             width: isMobile ? 30 : 35, 
             height: isMobile ? 30 : 35,
             border: '2px solid',
-            borderColor: 'primary.main'
+            borderColor: user.role === 'admin' ? 'error.main' : 'primary.main'
           }}
         >
           {user.name.charAt(0)}
@@ -137,17 +141,74 @@ const Header: React.FC = () => {
           height: isMobile ? 30 : 35,
           borderRadius: '50%',
           border: '2px solid',
-          borderColor: 'primary.main',
+          borderColor: user.role === 'admin' ? 'error.main' : 'primary.main',
           objectFit: 'cover'
         }}
       />
     );
   };
 
+  // Common styles for consistent button/icon alignment
+  const iconButtonStyle = {
+    p: 1,
+    height: '40px',
+    width: '40px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  };
+
+  const navButtonStyle = {
+    height: '40px',
+    display: 'flex',
+    alignItems: 'center',
+    position: 'relative',
+    px: 1.2,
+    mx: 0.5,
+    lineHeight: 1,
+    fontSize: '0.95rem',
+    fontWeight: 500,
+    color: 'text.primary',
+    whiteSpace: 'nowrap',
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      width: '0%',
+      height: '2px',
+      backgroundColor: 'primary.main',
+      transition: 'width 0.3s ease',
+    },
+    '&:hover': {
+      backgroundColor: 'transparent',
+      color: 'primary.main',
+    },
+    '&:hover::after': {
+      width: '100%',
+    },
+    '&.active': {
+      color: 'primary.main',
+      fontWeight: 600,
+    }
+  };
+
+  const authButtonStyle = {
+    height: '36px',
+    minHeight: '36px',
+    minWidth: '100px',
+    textTransform: 'none',
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+    py: 0,
+    borderRadius: '18px',
+    fontWeight: 500
+  };
+
   return (
     <AppBar position="sticky" color="default" elevation={1}>
       <Container maxWidth="lg">
-        <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
+        <Toolbar disableGutters sx={{ justifyContent: 'space-between', height: '64px' }}>
           {/* Logo */}
           <Typography
             variant="h6"
@@ -159,52 +220,63 @@ const Header: React.FC = () => {
               textDecoration: 'none',
               display: 'flex',
               alignItems: 'center',
+              height: '40px',
+              whiteSpace: 'nowrap',
+              lineHeight: 1,
+              minWidth: '160px'
             }}
           >
             <HomeIcon sx={{ mr: 1 }} />
-            BĐSN Việt Nam
+            BDSN Việt Nam
           </Typography>
           
           {/* Desktop Navigation */}
           {!isMobile && (
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                height: '40px', 
+                justifyContent: 'center',
+                flexGrow: 1,
+                ml: -2
+              }}
+            >
               {menuItems.map((item) => (
                 <Button
                   key={item.path}
                   component={Link}
                   to={item.path}
-                  sx={{ 
-                    mx: 1,
-                    position: 'relative',
-                    '&::after': {
-                      content: '""',
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      width: '0%',
-                      height: '2px',
-                      backgroundColor: 'primary.main',
-                      transition: 'width 0.3s ease',
-                    },
-                    '&:hover::after': {
-                      width: '100%',
-                    }
-                  }}
+                  sx={navButtonStyle}
+                  className={location.pathname === item.path ? 'active' : ''}
                 >
                   {item.title}
                 </Button>
               ))}
-              
+            </Box>
+          )}
+          
+          {/* User Actions Area */}
+          {!isMobile && (
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                height: '40px',
+                minWidth: '160px',
+                justifyContent: 'flex-end'
+              }}
+            >
               {/* Authenticated user controls */}
               {isAuthenticated && user ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', height: '40px' }}>
                   <IconButton 
                     component={Link} 
-                    to="/yeu-thich"
+                    to="/user/favorites"
                     color="primary"
-                    sx={{ mr: 1 }}
+                    sx={{ ...iconButtonStyle, mr: 1 }}
                   >
-                    <Badge badgeContent={3} color="secondary">
+                    <Badge color="secondary">
                       <FavoriteIcon />
                     </Badge>
                   </IconButton>
@@ -213,7 +285,7 @@ const Header: React.FC = () => {
                     component={Link} 
                     to="/thong-bao"
                     color="primary"
-                    sx={{ mr: 2 }}
+                    sx={{ ...iconButtonStyle, mr: 2 }}
                   >
                     <Badge badgeContent={5} color="secondary">
                       <NotificationsIcon />
@@ -222,7 +294,7 @@ const Header: React.FC = () => {
                   
                   <IconButton
                     onClick={handleUserMenuOpen}
-                    sx={{ p: 0 }}
+                    sx={{ ...iconButtonStyle, p: 0.5 }}
                   >
                     {renderAvatar()}
                   </IconButton>
@@ -240,38 +312,120 @@ const Header: React.FC = () => {
                       horizontal: 'right',
                     }}
                     PaperProps={{
-                      sx: { mt: 1.5, width: 200 }
+                      sx: { 
+                        mt: 1.5, 
+                        width: 220, 
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                        overflow: 'visible',
+                        '&:before': {
+                          content: '""',
+                          display: 'block',
+                          position: 'absolute',
+                          top: 0,
+                          right: 14,
+                          width: 10,
+                          height: 10,
+                          bgcolor: 'background.paper',
+                          transform: 'translateY(-50%) rotate(45deg)',
+                          zIndex: 0,
+                        },
+                      }
                     }}
                   >
-                    <MenuItem component={Link} to="/ho-so" onClick={handleUserMenuClose}>
-                      <PersonIcon sx={{ mr: 1, fontSize: 20 }} /> Hồ sơ cá nhân
+                    <MenuItem 
+                      component={Link} 
+                      to="/ho-so" 
+                      onClick={handleUserMenuClose}
+                      sx={{ py: 1.2 }}
+                    >
+                      <PersonIcon sx={{ mr: 1.5, fontSize: 20, color: 'primary.main' }} /> 
+                      <Typography sx={{ lineHeight: 1 }}>Hồ sơ cá nhân</Typography>
                     </MenuItem>
-                    <MenuItem component={Link} to="/user/my-properties" onClick={handleUserMenuClose}>
-                      <HomeIcon sx={{ mr: 1, fontSize: 20 }} /> Tin đã đăng
+                    <MenuItem 
+                      component={Link} 
+                      to="/user/my-properties" 
+                      onClick={handleUserMenuClose}
+                      sx={{ py: 1.2 }}
+                    >
+                      <HomeIcon sx={{ mr: 1.5, fontSize: 20, color: 'primary.main' }} /> 
+                      <Typography sx={{ lineHeight: 1 }}>Tin đã đăng</Typography>
                     </MenuItem>
-                    <MenuItem onClick={handleLogout}>
+                    <MenuItem 
+                      component={Link} 
+                      to="/user/favorites" 
+                      onClick={handleUserMenuClose}
+                      sx={{ py: 1.2 }}
+                    >
+                      <FavoriteIcon sx={{ mr: 1.5, fontSize: 20, color: 'primary.main' }} /> 
+                      <Typography sx={{ lineHeight: 1 }}>Bất động sản yêu thích</Typography>
+                    </MenuItem>
+                    
+                    {/* Admin Dashboard Link - Only visible for admin users */}
+                    {user?.role === 'admin' && (
+                      <MenuItem 
+                        component={Link} 
+                        to="/admin" 
+                        onClick={handleUserMenuClose}
+                        sx={{ py: 1.2 }}
+                      >
+                        <Box sx={{ color: 'error.main', display: 'flex', alignItems: 'center', width: '100%' }}>
+                          <DashboardIcon sx={{ mr: 1.5, fontSize: 20 }} /> 
+                          <Typography sx={{ lineHeight: 1 }}>Quản trị hệ thống</Typography>
+                        </Box>
+                      </MenuItem>
+                    )}
+                    
+                    <Divider sx={{ my: 1 }} />
+                    <MenuItem 
+                      onClick={handleLogout}
+                      sx={{ py: 1.2 }}
+                    >
                       <Box sx={{ color: 'error.main', display: 'flex', alignItems: 'center' }}>
-                        <PersonIcon sx={{ mr: 1, fontSize: 20 }} /> Đăng xuất
+                        <PersonIcon sx={{ mr: 1.5, fontSize: 20 }} /> 
+                        <Typography sx={{ lineHeight: 1 }}>Đăng xuất</Typography>
                       </Box>
                     </MenuItem>
                   </Menu>
                 </Box>
               ) : (
-                <Box sx={{ display: 'flex', ml: 2 }}>
-                  <Button 
-                    variant="outlined" 
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  height: '40px',
+                  justifyContent: 'flex-end'
+                }}>
+                  <IconButton 
                     onClick={handleLoginClick}
-                    sx={{ mr: 1 }}
-                  >
-                    Đăng nhập
-                  </Button>
-                  <Button 
-                    variant="contained" 
-                    onClick={handleRegisterClick}
                     color="primary"
+                    sx={{ ...iconButtonStyle, mr: 1 }}
+                    title="Yêu thích - Đăng nhập để sử dụng"
                   >
-                    Đăng ký
-                  </Button>
+                    <Badge color="secondary">
+                      <FavoriteIcon />
+                    </Badge>
+                  </IconButton>
+                  
+                  <Box sx={{ display: 'flex', alignItems: 'center', height: '40px' }}>
+                    <Button
+                      variant="outlined" 
+                      onClick={handleLoginClick}
+                      sx={{ 
+                        ...authButtonStyle,
+                        mr: 1
+                      }}
+                    >
+                      Đăng nhập
+                    </Button>
+                    <Button
+                      variant="contained" 
+                      onClick={handleRegisterClick}
+                      color="primary"
+                      sx={authButtonStyle}
+                    >
+                      Đăng ký
+                    </Button>
+                  </Box>
                 </Box>
               )}
             </Box>
@@ -279,28 +433,38 @@ const Header: React.FC = () => {
           
           {/* Mobile Navigation */}
           {isMobile && (
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              {isAuthenticated && user && (
-                <Box sx={{ mr: 1 }}>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                height: '40px',
+                flexGrow: 1,
+                justifyContent: 'flex-end'
+              }}
+            >
+              {isAuthenticated && user ? (
+                <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', height: '40px' }}>
                   <IconButton 
                     component={Link} 
-                    to="/yeu-thich"
+                    to="/user/favorites"
                     color="primary"
-                    size="small"
+                    sx={{ ...iconButtonStyle, p: 0.8 }}
                   >
-                    <Badge badgeContent={3} color="secondary">
+                    <Badge color="secondary">
                       <FavoriteIcon fontSize="small" />
                     </Badge>
                   </IconButton>
-                  
+                </Box>
+              ) : (
+                <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', height: '40px' }}>
                   <IconButton 
-                    component={Link} 
-                    to="/thong-bao"
+                    onClick={handleLoginClick}
                     color="primary"
-                    size="small"
+                    sx={{ ...iconButtonStyle, p: 0.8 }}
+                    title="Yêu thích - Đăng nhập để sử dụng"
                   >
-                    <Badge badgeContent={5} color="secondary">
-                      <NotificationsIcon fontSize="small" />
+                    <Badge color="secondary">
+                      <FavoriteIcon fontSize="small" />
                     </Badge>
                   </IconButton>
                 </Box>
@@ -311,6 +475,7 @@ const Header: React.FC = () => {
                 color="inherit"
                 aria-label="menu"
                 onClick={handleMobileMenuOpen}
+                sx={{ ...iconButtonStyle, p: 0.8 }}
               >
                 <MenuIcon />
               </IconButton>
@@ -320,44 +485,106 @@ const Header: React.FC = () => {
                 open={Boolean(mobileMenuAnchorEl)}
                 onClose={handleMobileMenuClose}
                 PaperProps={{
-                  sx: { width: 250 }
+                  sx: { 
+                    width: 240,
+                    mt: 1,
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+                  }
                 }}
               >
                 {menuItems.map((item) => (
-                  <MenuItem 
+                  <MenuItem
                     key={item.path}
                     component={Link}
                     to={item.path}
                     onClick={handleMobileMenuClose}
-                    sx={{ py: 1.5 }}
+                    sx={{ 
+                      py: 1.5, 
+                      lineHeight: 1, 
+                      whiteSpace: 'nowrap',
+                      borderLeft: location.pathname === item.path ? '3px solid' : '3px solid transparent',
+                      borderColor: location.pathname === item.path ? 'primary.main' : 'transparent',
+                      bgcolor: location.pathname === item.path ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
+                      pl: location.pathname === item.path ? 2 : 2.3,
+                      transition: 'all 0.2s ease'
+                    }}
                   >
-                    {item.icon}
-                    <Typography sx={{ ml: 1 }}>{item.title}</Typography>
+                    {React.cloneElement(item.icon, { 
+                      color: location.pathname === item.path ? 'primary' : 'inherit',
+                      sx: { fontSize: '1.2rem' }
+                    })}
+                    <Typography 
+                      sx={{ 
+                        ml: 1.5, 
+                        lineHeight: 1,
+                        fontWeight: location.pathname === item.path ? 600 : 400,
+                        color: location.pathname === item.path ? 'primary.main' : 'inherit'
+                      }}
+                    >
+                      {item.title}
+                    </Typography>
                   </MenuItem>
                 ))}
+                
+                {/* Admin Dashboard Link in Mobile Menu - Only visible for admin users */}
+                {isAuthenticated && user?.role === 'admin' && (
+                  <MenuItem
+                    component={Link}
+                    to="/admin"
+                    onClick={handleMobileMenuClose}
+                    sx={{ 
+                      py: 1.5, 
+                      lineHeight: 1, 
+                      whiteSpace: 'nowrap',
+                      borderLeft: location.pathname === '/admin' ? '3px solid' : '3px solid transparent',
+                      borderColor: location.pathname === '/admin' ? 'error.main' : 'transparent',
+                      bgcolor: location.pathname === '/admin' ? 'rgba(211, 47, 47, 0.08)' : 'transparent',
+                      pl: location.pathname === '/admin' ? 2 : 2.3,
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <DashboardIcon
+                      color={location.pathname === '/admin' ? 'error' : 'inherit'}
+                      sx={{ fontSize: '1.2rem' }}
+                    />
+                    <Typography sx={{ ml: 2, color: 'error.main', fontWeight: 'medium' }}>Quản trị hệ thống</Typography>
+                  </MenuItem>
+                )}
+                
+                <Divider sx={{ my: 1 }} />
                 
                 <Box sx={{ borderTop: '1px solid', borderColor: 'divider', mt: 1 }}>
                   {isAuthenticated && user ? (
                     <>
                       <MenuItem component={Link} to="/ho-so" onClick={handleMobileMenuClose}>
-                        <PersonIcon sx={{ mr: 1 }} /> Hồ sơ cá nhân
+                        <PersonIcon sx={{ mr: 1 }} /> 
+                        <Typography sx={{ lineHeight: 1 }}>Hồ sơ cá nhân</Typography>
                       </MenuItem>
                       <MenuItem component={Link} to="/user/my-properties" onClick={handleMobileMenuClose}>
-                        <HomeIcon sx={{ mr: 1 }} /> Tin đã đăng
+                        <HomeIcon sx={{ mr: 1 }} /> 
+                        <Typography sx={{ lineHeight: 1 }}>Tin đã đăng</Typography>
+                      </MenuItem>
+                      <MenuItem component={Link} to="/user/favorites" onClick={handleMobileMenuClose}>
+                        <FavoriteIcon sx={{ mr: 1 }} /> 
+                        <Typography sx={{ lineHeight: 1 }}>Bất động sản yêu thích</Typography>
                       </MenuItem>
                       <MenuItem onClick={handleLogout}>
                         <Box sx={{ color: 'error.main', display: 'flex', alignItems: 'center' }}>
-                          <PersonIcon sx={{ mr: 1 }} /> Đăng xuất
+                          <PersonIcon sx={{ mr: 1 }} /> 
+                          <Typography sx={{ lineHeight: 1 }}>Đăng xuất</Typography>
                         </Box>
                       </MenuItem>
                     </>
                   ) : (
                     <>
                       <MenuItem onClick={(e) => { handleMobileMenuClose(); handleLoginClick(); }}>
-                        <PersonIcon sx={{ mr: 1 }} /> Đăng nhập
+                        <PersonIcon sx={{ mr: 1 }} /> 
+                        <Typography sx={{ lineHeight: 1 }}>Đăng nhập</Typography>
                       </MenuItem>
                       <MenuItem onClick={(e) => { handleMobileMenuClose(); handleRegisterClick(); }}>
-                        <PersonIcon sx={{ mr: 1 }} /> Đăng ký
+                        <PersonIcon sx={{ mr: 1 }} /> 
+                        <Typography sx={{ lineHeight: 1 }}>Đăng ký</Typography>
                       </MenuItem>
                     </>
                   )}
