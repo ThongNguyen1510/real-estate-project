@@ -1,6 +1,6 @@
 import axios from 'axios';
+import { API_URL } from '../../config';
 
-const API_URL = '/api';
 const PROVINCES_API_URL = 'https://provinces.open-api.vn/api';
 
 interface LocationResponse {

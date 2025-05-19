@@ -31,7 +31,8 @@ import {
   VisibilityOff as VisibilityOffIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
-import { userService, authService } from '../services/api';
+import { authService } from '../services/api';
+import userService from '../services/api/userService';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -89,8 +90,7 @@ const UserProfilePage: React.FC = () => {
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     email: user?.email || '',
-    phone: user?.phone || '',
-    address: ''
+    phone: user?.phone || ''
   });
   
   // Password change form
@@ -108,14 +108,18 @@ const UserProfilePage: React.FC = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
+  // Add new states for counts
+  const [propertiesCount, setPropertiesCount] = useState<number>(0);
+  const [favoritesCount, setFavoritesCount] = useState<number>(0);
+  const [countsLoading, setCountsLoading] = useState<boolean>(true);
+  
   // Update profile data when user changes
   useEffect(() => {
     if (user) {
       setProfileData({
         name: user.name,
         email: user.email,
-        phone: user.phone || '',
-        address: ''
+        phone: user.phone || ''
       });
     }
   }, [user]);
@@ -176,6 +180,34 @@ const UserProfilePage: React.FC = () => {
     fetchUserData();
   }, []);
   
+  // Add useEffect to fetch counts
+  useEffect(() => {
+    const fetchCounts = async () => {
+      if (!user) return;
+      
+      try {
+        setCountsLoading(true);
+        // Fetch property count
+        const propertyResponse = await userService.getUserPropertyCount();
+        if (propertyResponse.success) {
+          setPropertiesCount(propertyResponse.data.count || 0);
+        }
+        
+        // Fetch favorites count
+        const favoriteResponse = await userService.getUserFavoriteCount();
+        if (favoriteResponse.success) {
+          setFavoritesCount(favoriteResponse.data.count || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching counts:', error);
+      } finally {
+        setCountsLoading(false);
+      }
+    };
+    
+    fetchCounts();
+  }, [user]);
+  
   // Handle tab change
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -208,8 +240,7 @@ const UserProfilePage: React.FC = () => {
       setProfileData({
         name: user.name,
         email: user.email,
-        phone: user.phone || '',
-        address: ''
+        phone: user.phone || ''
       });
     }
   };
@@ -360,10 +391,10 @@ const UserProfilePage: React.FC = () => {
         onError={(e) => {
           console.error("Error loading avatar image:", e);
           // If image fails to load, fallback to initial
-          e.currentTarget.onerror = null;
+          (e.currentTarget as HTMLImageElement).onerror = null;
           // Use a data attribute to prevent infinite retries
-          if (!e.currentTarget.dataset.retried && user) {
-            e.currentTarget.dataset.retried = 'true';
+          if (!(e.currentTarget as HTMLImageElement).dataset.retried && user) {
+            (e.currentTarget as HTMLImageElement).dataset.retried = 'true';
             console.log("Retrying with user initial");
             // Force re-render with empty src to show the fallback UI
             setUser({...user, avatar: ''});
@@ -398,7 +429,7 @@ const UserProfilePage: React.FC = () => {
           <Grid item xs={12} md={4}>
             <Paper sx={{ p: 3, textAlign: 'center' }}>
               {/* Avatar */}
-              <Box sx={{ position: 'relative', mb: 2, display: 'inline-block' }}>
+              <Box sx={{ position: 'relative', mb: 2, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                 {renderAvatar()}
                 
                 {/* Upload button */}
@@ -440,15 +471,41 @@ const UserProfilePage: React.FC = () => {
               {/* Profile stats */}
               <Grid container spacing={2} sx={{ mt: 2 }}>
                 <Grid item xs={6}>
-                  <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
-                    <Typography variant="h6" fontWeight="bold">0</Typography>
+                  <Paper 
+                    sx={{ 
+                      p: 2, 
+                      bgcolor: 'action.hover',
+                      position: 'relative',
+                      minHeight: 80
+                    }}
+                  >
+                    {countsLoading ? (
+                      <CircularProgress size={20} sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+                    ) : (
+                      <>
+                        <Typography variant="h6" fontWeight="bold">{propertiesCount}</Typography>
                     <Typography variant="body2" color="text.secondary">Tin đăng</Typography>
+                      </>
+                    )}
                   </Paper>
                 </Grid>
                 <Grid item xs={6}>
-                  <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
-                    <Typography variant="h6" fontWeight="bold">0</Typography>
+                  <Paper 
+                    sx={{ 
+                      p: 2, 
+                      bgcolor: 'action.hover',
+                      position: 'relative',
+                      minHeight: 80
+                    }}
+                  >
+                    {countsLoading ? (
+                      <CircularProgress size={20} sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+                    ) : (
+                      <>
+                        <Typography variant="h6" fontWeight="bold">{favoritesCount}</Typography>
                     <Typography variant="body2" color="text.secondary">Yêu thích</Typography>
+                      </>
+                    )}
                   </Paper>
                 </Grid>
               </Grid>
@@ -549,24 +606,6 @@ const UserProfilePage: React.FC = () => {
                           startAdornment: (
                             <InputAdornment position="start">
                               <PhoneIcon />
-                            </InputAdornment>
-                          ),
-                        }}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Địa chỉ"
-                        name="address"
-                        value={profileData.address}
-                        onChange={handleProfileChange}
-                        disabled={!isEditing || loading}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <HomeIcon />
                             </InputAdornment>
                           ),
                         }}

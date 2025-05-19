@@ -251,7 +251,7 @@ export const propertyService = {
     try {
       console.log('Sending property data:', propertyData);
       
-      // Cấu trúc lại dữ liệu để phù hợp với API
+      // Ensure location data is properly structured
       const formattedData = {
         title: propertyData.title,
         description: propertyData.description,
@@ -264,17 +264,23 @@ export const propertyService = {
         amenities: propertyData.amenities,
         contact_info: propertyData.contact_info,
         location: {
-          city: propertyData.city,
-          district: propertyData.district,
-          ward: propertyData.ward || null,
-          address: propertyData.address,
-          latitude: null,
-          longitude: null
+          address: propertyData.location.address,
+          street: propertyData.location.street,
+          city: propertyData.location.city,
+          city_name: propertyData.location.city_name,
+          district: propertyData.location.district,
+          district_name: propertyData.location.district_name,
+          ward: propertyData.location.ward,
+          ward_name: propertyData.location.ward_name,
+          latitude: Number(propertyData.location.latitude),
+          longitude: Number(propertyData.location.longitude)
         },
         status: 'pending'
       };
 
-      // Gọi API tạo bất động sản
+      console.log('Formatted data being sent:', formattedData);
+
+      // Call API to create property
       const response = await api.post('/api/properties/create', formattedData);
       console.log('Property creation response:', response.data);
       
@@ -286,6 +292,7 @@ export const propertyService = {
     } catch (error: any) {
       console.error('Error creating property:', error);
       if (error.response && error.response.data) {
+        console.error('Server error response:', error.response.data);
         throw new Error(error.response.data.message || 'Lỗi khi tạo bất động sản');
       }
       throw error;
@@ -446,6 +453,106 @@ export const favoritesService = {
     const response = await api.delete(`/api/favorites/${favoriteId}`);
     return response.data;
   },
+};
+
+// Notification services
+export const notificationService = {
+  // Get all notifications
+  getNotifications: async (params: any = {}) => {
+    try {
+      console.log('API: Calling getNotifications with params:', params);
+      const response = await api.get('/api/notifications', { params });
+      console.log('API: getNotifications response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('API: Error in getNotifications:', error);
+      // Return a fallback response so the UI doesn't break
+      return { 
+        success: false, 
+        message: 'Failed to fetch notifications',
+        data: { notifications: [] } 
+      };
+    }
+  },
+  
+  // Get unread notification count
+  getUnreadCount: async () => {
+    try {
+      console.log('API: Calling getUnreadCount');
+      const response = await api.get('/api/notifications/unread-count');
+      console.log('API: getUnreadCount response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('API: Error in getUnreadCount:', error);
+      // Return a fallback response so the UI doesn't break
+      return { success: false, data: { unread_count: 0 } };
+    }
+  },
+  
+  // Mark a notification as read
+  markAsRead: async (notificationId: number) => {
+    try {
+      console.log('API: Marking notification as read:', notificationId);
+      const response = await api.put(`/api/notifications/${notificationId}/read`);
+      console.log('API: markAsRead response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('API: Error in markAsRead:', error);
+      return { success: false, message: 'Failed to mark notification as read' };
+    }
+  },
+  
+  // Mark all notifications as read
+  markAllAsRead: async () => {
+    try {
+      console.log('API: Marking all notifications as read');
+      const response = await api.put('/api/notifications/read-all');
+      console.log('API: markAllAsRead response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('API: Error in markAllAsRead:', error);
+      return { success: false, message: 'Failed to mark all notifications as read' };
+    }
+  },
+  
+  // Delete a notification
+  deleteNotification: async (notificationId: number) => {
+    try {
+      console.log('API: Deleting notification:', notificationId);
+      const response = await api.delete(`/api/notifications/${notificationId}`);
+      console.log('API: deleteNotification response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('API: Error in deleteNotification:', error);
+      return { success: false, message: 'Failed to delete notification' };
+    }
+  },
+  
+  // Get notification settings
+  getSettings: async () => {
+    try {
+      console.log('API: Getting notification settings');
+      const response = await api.get('/api/notifications/settings');
+      console.log('API: getSettings response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('API: Error in getSettings:', error);
+      return { success: false, data: {} };
+    }
+  },
+  
+  // Update notification settings
+  updateSettings: async (settings: any) => {
+    try {
+      console.log('API: Updating notification settings:', settings);
+      const response = await api.put('/api/notifications/settings', settings);
+      console.log('API: updateSettings response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('API: Error in updateSettings:', error);
+      return { success: false, message: 'Failed to update notification settings' };
+    }
+  }
 };
 
 export default api; 

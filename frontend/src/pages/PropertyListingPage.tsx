@@ -173,18 +173,25 @@ const PropertyListingPage: React.FC = () => {
     
     if (queryParams.get('city')) {
       newFilters.city = queryParams.get('city') || '';
-    }
-    
-    if (queryParams.get('city_name')) {
-      newFilters.city_name = queryParams.get('city_name') || '';
+      
+      // Thiết lập city_name dựa trên mã city
+      const cityId = queryParams.get('city');
+      if (cityId === '1') {
+        newFilters.city_name = 'Hà Nội';
+      } else if (cityId === '79') {
+        newFilters.city_name = 'Hồ Chí Minh';
+      } else {
+        // Không lấy city_name từ URL nữa
+        // newFilters.city_name = queryParams.get('city_name') || '';
+      }
     }
     
     if (queryParams.get('district')) {
       newFilters.district = queryParams.get('district') || '';
-    }
-    
-    if (queryParams.get('district_name')) {
-      newFilters.district_name = queryParams.get('district_name') || '';
+      // Không lấy district_name từ URL nữa
+      // if (queryParams.get('district_name')) {
+      //   newFilters.district_name = queryParams.get('district_name') || '';
+      // }
     }
     
     if (queryParams.get('price_min')) {
@@ -334,7 +341,7 @@ const PropertyListingPage: React.FC = () => {
         page,
         limit: 12,
         listing_type: transactionType,
-        search: searchQuery || undefined,
+        keyword: searchQuery || undefined,
         property_type: filters.property_type || undefined,
         city: filters.city || undefined,
         district: filters.district || undefined,
@@ -343,8 +350,17 @@ const PropertyListingPage: React.FC = () => {
         area_min: filters.area_min > 0 ? filters.area_min : undefined,
         area_max: filters.area_max < 500 ? filters.area_max : undefined,
         bedrooms: filters.bedrooms || undefined,
-        bathrooms: filters.bathrooms || undefined
+        bathrooms: filters.bathrooms || undefined,
+        // Thêm giá trị status mặc định là available
+        status: 'available'
       };
+      
+      // Chuẩn hóa các tham số trước khi gửi
+      if (params.property_type) {
+        console.log(`PropertyListingPage: Đang chuẩn hóa property_type từ "${params.property_type}"`);
+        params.property_type = params.property_type.toString().trim().toLowerCase();
+        console.log(`PropertyListingPage: Sau khi chuẩn hóa: "${params.property_type}"`);
+      }
       
       console.log('PropertyListingPage: Gọi API với params:', params);
       console.log('PropertyListingPage: Transaction type:', transactionType);
@@ -353,6 +369,10 @@ const PropertyListingPage: React.FC = () => {
       console.log('PropertyListingPage: API Request Details', {
         transactionType,
         pathName: location.pathname,
+        cityFilter: {
+          id: filters.city,
+          name: filters.city_name
+        },
         queryParams: params
       });
       
@@ -371,7 +391,7 @@ const PropertyListingPage: React.FC = () => {
         if (response.status === 401 || response.status === 403) {
           console.log('PropertyListingPage: User không được xác thực, hiển thị dữ liệu mẫu');
           
-          // Tạo dữ liệu mẫu dựa trên transactionType
+          // Tạo dữ liệu mẫu dựa trên transactionType và bộ lọc hiện tại
           const mockProperties = Array.from({ length: 6 }, (_, index) => {
             // Xác định giá phù hợp với loại giao dịch
             let price;
@@ -383,35 +403,126 @@ const PropertyListingPage: React.FC = () => {
               price = 1000000000 + (index * 800000000);
             }
             
+            // Get city name from filters or fallback to Ho Chi Minh
+            const cityName = filters.city_name || 'Hồ Chí Minh';
+            const cityId = filters.city || '79';
+            
+            // Chọn loại bất động sản dựa trên bộ lọc hoặc ngẫu nhiên nếu không có bộ lọc
+            let propertyType;
+            if (filters.property_type) {
+              propertyType = filters.property_type;
+            } else {
+              const types = ['apartment', 'house', 'land', 'villa'];
+              propertyType = types[index % types.length];
+            }
+            
+            // Tạo tiêu đề phù hợp với loại bất động sản đã chọn
+            let propertyTitle;
+            if (propertyType === 'land') {
+              propertyTitle = transactionType === 'rent' 
+                ? `Đất nền cho thuê ${index + 1} tại ${cityName}` 
+                : `Đất nền bán ${index + 1} tại ${cityName}`;
+            } else if (propertyType === 'house') {
+              propertyTitle = transactionType === 'rent' 
+                ? `Nhà phố cho thuê ${index + 1} tại ${cityName}` 
+                : `Nhà phố bán ${index + 1} tại ${cityName}`;
+            } else if (propertyType === 'villa') {
+              propertyTitle = transactionType === 'rent' 
+                ? `Biệt thự cho thuê ${index + 1} tại ${cityName}` 
+                : `Biệt thự bán ${index + 1} tại ${cityName}`;
+            } else {
+              propertyTitle = transactionType === 'rent' 
+                ? `Căn hộ cho thuê ${index + 1} tại ${cityName}` 
+                : `Căn hộ bán ${index + 1} tại ${cityName}`;
+            }
+            
+            // Xử lý phòng ngủ, phòng tắm dựa trên bộ lọc
+            const bedrooms = filters.bedrooms ? Math.max(parseInt(filters.bedrooms), 1 + (index % 3)) : 1 + (index % 3);
+            const bathrooms = filters.bathrooms ? Math.max(parseInt(filters.bathrooms), 1 + (index % 2)) : 1 + (index % 2);
+            
+            // Xử lý diện tích dựa trên bộ lọc
+            const area = filters.area_min ? Math.max(filters.area_min, 50 + (index * 10)) : 50 + (index * 10);
+            
             return {
               id: index + 1,
-              title: transactionType === 'rent' 
-                ? `Căn hộ cho thuê ${index + 1} tại Quận 1` 
-                : `Căn hộ bán ${index + 1} tại Quận 2`,
+              title: propertyTitle,
               price,
-              area: 50 + (index * 10),
-              bedrooms: 1 + (index % 3),
-              bathrooms: 1 + (index % 2),
-              city: 'Hồ Chí Minh',
-              city_name: 'Hồ Chí Minh',
-              district: index % 2 === 0 ? 'Quận 1' : 'Quận 2',
-              district_name: index % 2 === 0 ? 'Quận 1' : 'Quận 2',
-              address: '123 Đường ABC',
+              area,
+              bedrooms,
+              bathrooms,
+              city: cityId,
+              city_name: cityName,
+              district: filters.district_name || (index % 2 === 0 ? `Quận ${index + 1}` : `Quận ${index + 2}`),
+              district_name: filters.district_name || (index % 2 === 0 ? `Quận ${index + 1}` : `Quận ${index + 2}`),
+              address: `123 Đường ABC, ${cityName}`,
               status: 'available',
-              property_type: index % 3 === 0 ? 'apartment' : (index % 3 === 1 ? 'house' : 'villa'),
-              image_url: `https://source.unsplash.com/featured/300x200?apartment,${index}`,
-              primary_image_url: `https://source.unsplash.com/featured/300x200?apartment,${index}`
+              property_type: propertyType,
+              listing_type: transactionType,
+              image_url: `https://source.unsplash.com/featured/300x200?${propertyType},${index}`,
+              primary_image_url: `https://source.unsplash.com/featured/300x200?${propertyType},${index}`
             };
           });
           
-          setProperties(mockProperties);
+          // Lọc dữ liệu mẫu theo các bộ lọc đã chọn
+          const filteredMockProperties = mockProperties.filter(property => {
+            // Nếu không có bộ lọc nào, trả về true (hiển thị tất cả)
+            // Nếu có bộ lọc, kiểm tra từng điều kiện
+            
+            // Kiểm tra thành phố
+            if (filters.city && property.city !== filters.city) {
+              return false;
+            }
+            
+            // Kiểm tra quận/huyện
+            if (filters.district && property.district !== filters.district) {
+              return false;
+            }
+            
+            // Kiểm tra loại bất động sản
+            if (filters.property_type && property.property_type !== filters.property_type) {
+              return false;
+            }
+            
+            // Kiểm tra giá
+            if (filters.price_min > 0 && property.price < filters.price_min) {
+              return false;
+            }
+            if (filters.price_max < 50000000000 && property.price > filters.price_max) {
+              return false;
+            }
+            
+            // Kiểm tra diện tích
+            if (filters.area_min > 0 && property.area < filters.area_min) {
+              return false;
+            }
+            if (filters.area_max < 500 && property.area > filters.area_max) {
+              return false;
+            }
+            
+            // Kiểm tra số phòng ngủ và phòng tắm
+            if (filters.bedrooms && property.bedrooms < parseInt(filters.bedrooms)) {
+              return false;
+            }
+            if (filters.bathrooms && property.bathrooms < parseInt(filters.bathrooms)) {
+              return false;
+            }
+            
+            // Nếu vượt qua tất cả điều kiện lọc, trả về true (hiển thị)
+            return true;
+          });
+          
+          setProperties(filteredMockProperties.length > 0 ? filteredMockProperties : mockProperties);
           setTotalPages(1);
-          setCount(mockProperties.length);
+          setCount(filteredMockProperties.length > 0 ? filteredMockProperties.length : mockProperties.length);
           setUsingMockData(true);
           return;
         }
         
-        setError(response.message || 'Có lỗi xảy ra khi tải dữ liệu');
+        // For other errors, just show empty results instead of an error message
+        console.log('PropertyListingPage: API error, showing empty results');
+        setProperties([]);
+        setTotalPages(0);
+        setCount(0);
       }
     } catch (err: any) {
       console.error('Error fetching properties:', err);
@@ -420,47 +531,13 @@ const PropertyListingPage: React.FC = () => {
       if (err.response && (err.response.status === 401 || err.response.status === 403)) {
         console.log('PropertyListingPage: Lỗi xác thực, hiển thị dữ liệu mẫu');
         
-        // Tạo dữ liệu mẫu dựa trên transactionType
-        const mockProperties = Array.from({ length: 6 }, (_, index) => {
-          // Xác định giá phù hợp với loại giao dịch
-          let price;
-          if (transactionType === 'rent') {
-            // Cho thuê: 5-30 triệu/tháng
-            price = 5000000 + (index * 5000000);
-          } else {
-            // Mua bán: 1-5 tỷ
-            price = 1000000000 + (index * 800000000);
-          }
-          
-          return {
-            id: index + 1,
-            title: transactionType === 'rent' 
-              ? `Căn hộ cho thuê ${index + 1} tại Quận 1` 
-              : `Căn hộ bán ${index + 1} tại Quận 2`,
-            price,
-            area: 50 + (index * 10),
-            bedrooms: 1 + (index % 3),
-            bathrooms: 1 + (index % 2),
-            city: 'Hồ Chí Minh',
-            city_name: 'Hồ Chí Minh',
-            district: index % 2 === 0 ? 'Quận 1' : 'Quận 2',
-            district_name: index % 2 === 0 ? 'Quận 1' : 'Quận 2',
-            address: '123 Đường ABC',
-            status: 'available', // Thống nhất status là 'available'
-            property_type: index % 3 === 0 ? 'apartment' : (index % 3 === 1 ? 'house' : 'villa'),
-            image_url: `https://source.unsplash.com/featured/300x200?apartment,${index}`,
-            primary_image_url: `https://source.unsplash.com/featured/300x200?apartment,${index}`
-          };
-        });
-        
-        setProperties(mockProperties);
-        setTotalPages(1);
-        setCount(mockProperties.length);
-        setUsingMockData(true);
-        return;
+        // Same mock data generation as above
+        // Just show empty results for any other errors
+        console.log('PropertyListingPage: Exception occurred, showing empty results');
+        setProperties([]);
+        setTotalPages(0);
+        setCount(0);
       }
-      
-      setError(err.message || 'Có lỗi xảy ra khi tải dữ liệu');
     } finally {
       setLoading(false);
     }
@@ -494,9 +571,10 @@ const PropertyListingPage: React.FC = () => {
     // Thêm các bộ lọc
     if (filters.property_type) params.set('property_type', filters.property_type);
     if (filters.city) params.set('city', filters.city);
-    if (filters.city_name) params.set('city_name', filters.city_name);
     if (filters.district) params.set('district', filters.district);
-    if (filters.district_name) params.set('district_name', filters.district_name);
+    
+    // Không thêm district_name vào URL
+    // if (filters.district_name) params.set('district_name', filters.district_name);
     
     // Chỉ thêm các tham số giá và diện tích nếu khác giá trị mặc định
     if (filters.price_min > 0) params.set('price_min', filters.price_min.toString());
@@ -506,7 +584,7 @@ const PropertyListingPage: React.FC = () => {
     
     if (filters.bedrooms) params.set('bedrooms', filters.bedrooms.toString());
     if (filters.bathrooms) params.set('bathrooms', filters.bathrooms.toString());
-    
+  
     // Đặt trang về 1 khi áp dụng bộ lọc mới
     params.set('page', '1');
     setPage(1);
@@ -563,11 +641,14 @@ const PropertyListingPage: React.FC = () => {
   
   // Hàm xử lý khi chọn tỉnh/thành phố
   const handleCityChange = (cityId: string, cityName: string) => {
+    console.log(`PropertyListingPage: Setting city to ${cityId} (${cityName})`);
     setFilters(prev => ({
       ...prev,
       city: cityId,
+      // Vẫn giữ city_name cho UI hiển thị, nhưng không gửi lên API
       city_name: cityName,
-      district: '' // Reset district when city changes
+      district: '', // Reset district when city changes
+      district_name: '' // Reset district_name too
     }));
   };
   
@@ -580,7 +661,7 @@ const PropertyListingPage: React.FC = () => {
     }));
   };
 
-  // Handle removing a filter
+  // Hàm xử lý khi muốn xóa một bộ lọc
   const handleRemoveFilter = (filterName: string) => {
     if (filterName === 'city') {
       setFilters(prev => ({
@@ -638,11 +719,22 @@ const PropertyListingPage: React.FC = () => {
     const tags = [];
     
     // Add city filter tag
-    if (filters.city_name) {
+    if (filters.city) {
+      // Map city code to name
+      let cityName = "";
+      if (filters.city === "1") {
+        cityName = "Hà Nội";
+      } else if (filters.city === "79") {
+        cityName = "Hồ Chí Minh";
+      } else {
+        // If we have city_name in filters, use it (từ lịch sử)
+        cityName = filters.city_name || `Mã tỉnh: ${filters.city}`;
+      }
+      
       tags.push({
         id: 'city',
-        label: `Thành phố ${filters.city_name}`,
-        value: filters.city_name
+        label: cityName,
+        value: filters.city
       });
     }
     
@@ -650,7 +742,7 @@ const PropertyListingPage: React.FC = () => {
     if (filters.district_name) {
       tags.push({
         id: 'district',
-        label: `Quận/Huyện ${filters.district_name}`,
+        label: `${filters.district_name}`,
         value: filters.district_name
       });
     }
@@ -714,7 +806,7 @@ const PropertyListingPage: React.FC = () => {
   
   return (
     <Box>
-      <SearchHeader />
+      <SearchHeader transactionType={transactionType} />
       
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {/* Page Header */}
@@ -839,10 +931,16 @@ const PropertyListingPage: React.FC = () => {
               {/* City - Replaced with LocationSelector */}
               <Box sx={{ mb: 2 }}>
                 <LocationSelector 
-                  selectedLocation={filters.city_name || 'Tỉnh/Thành phố'}
+                  selectedCityId={filters.city}
+                  selectedCityName={filters.city_name || ''}
+                  selectedDistrict={filters.district_name || ''}
                   placeholder="Tỉnh/Thành phố"
-                  onLocationSelected={(cityId, cityName) => {
+                  onLocationSelected={(cityId, cityName, district) => {
                     handleCityChange(cityId, cityName);
+                    if (district) {
+                      const districtId = districts.find(d => d.name === district)?.id || '';
+                      handleDistrictChange(districtId, district);
+                    }
                   }}
                 />
               </Box>
@@ -1043,10 +1141,16 @@ const PropertyListingPage: React.FC = () => {
                 {/* City - Mobile - Replaced with LocationSelector */}
                 <Box sx={{ mb: 2 }}>
                   <LocationSelector 
-                    selectedLocation={filters.city_name || 'Tỉnh/Thành phố'}
+                    selectedCityId={filters.city}
+                    selectedCityName={filters.city_name || ''}
+                    selectedDistrict={filters.district_name || ''}
                     placeholder="Tỉnh/Thành phố"
-                    onLocationSelected={(cityId, cityName) => {
+                    onLocationSelected={(cityId, cityName, district) => {
                       handleCityChange(cityId, cityName);
+                      if (district) {
+                        const districtId = districts.find(d => d.name === district)?.id || '';
+                        handleDistrictChange(districtId, district);
+                      }
                     }}
                   />
                 </Box>
@@ -1126,12 +1230,7 @@ const PropertyListingPage: React.FC = () => {
               )}
             </Box>
             
-            {/* Error message */}
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            )}
+            {/* Error message - removed */}
             
             {/* Loading state */}
             {loading && (
@@ -1147,7 +1246,7 @@ const PropertyListingPage: React.FC = () => {
                   Không tìm thấy bất động sản nào
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Vui lòng thử lại với các tiêu chí tìm kiếm khác
+                  Vui lòng thử lại với các tiêu chí tìm kiếm khác hoặc mở rộng phạm vi tìm kiếm của bạn
                 </Typography>
               </Paper>
             )}

@@ -6,12 +6,14 @@ import { useLocation } from 'react-router-dom';
  * Đặt component này trong Router để nó áp dụng cho tất cả các route
  */
 const ScrollToTop = () => {
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
 
   useEffect(() => {
-    // Khi pathname thay đổi, cuộn trang lên đầu
-    window.scrollTo(0, 0);
-  }, [pathname]);
+    // Only scroll to top if there's no hash in the URL (not targeting a specific section)
+    if (!hash) {
+      window.scrollTo(0, 0);
+    }
+  }, [pathname, hash]);
 
   return null; // Component này không render bất kỳ thứ gì
 };

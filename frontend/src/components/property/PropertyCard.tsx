@@ -24,33 +24,16 @@ import { formatPrice } from '../../utils/format';
 import { useFavorites } from '../../contexts/FavoritesContext';
 
 interface PropertyCardProps {
-  property: {
-    id: number;
-    title: string;
-    address?: string;
-    city?: string;
-    city_name?: string;
-    district?: string;
-    district_name?: string;
-    ward?: string;
-    ward_name?: string;
-    full_address?: string;
-    price: number;
-    area: number;
-    bedrooms?: number;
-    bathrooms?: number;
-    images?: any[];
-    image_url?: string;
-    primary_image_url?: string;
-    status?: string;
-    property_type: string;
-    isFavorite?: boolean;
-    listing_type?: string;
-  };
-  onFavoriteToggle?: (id: number) => void;
+  property: any;
+  onFavoriteToggle?: (propertyId: number, isFavorite: boolean) => void;
+  isFavorite?: boolean;
 }
 
-const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle }) => {
+const PropertyCard: React.FC<PropertyCardProps> = ({ 
+  property, 
+  onFavoriteToggle,
+  isFavorite = false 
+}) => {
   const [isToggling, setIsToggling] = useState(false);
   
   const {
@@ -73,15 +56,17 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
     primary_image_url,
     status,
     property_type,
-    isFavorite = false,
-    listing_type
+    isFavorite: propertyIsFavorite,
+    listing_type,
+    expires_at,
+    created_at
   } = property;
 
   // Use the favorites context
   const { toggleFavorite: contextToggleFavorite, isFavorite: checkIsFavorite } = useFavorites();
 
   // Check if property is favorite from context or props
-  const isPropertyFavorite = isFavorite || checkIsFavorite(id);
+  const isPropertyFavorite = propertyIsFavorite || checkIsFavorite(id);
 
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -93,7 +78,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
     try {
       // Use provided toggle function or context toggle function
       if (onFavoriteToggle) {
-        await onFavoriteToggle(id);
+        await onFavoriteToggle(id, !isPropertyFavorite);
       } else {
         await contextToggleFavorite(id);
       }
@@ -104,7 +89,21 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
     }
   };
 
-  const handleCardClick = () => {
+  // Kiểm tra tin đã hết hạn chưa
+  const isExpired = (expiresAt?: string): boolean => {
+    if (!expiresAt) return false;
+    const expiryDate = new Date(expiresAt);
+    const now = new Date();
+    return expiryDate < now;
+  };
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Không cho phép xem tin đã hết hạn
+    if (isExpired(expires_at)) {
+      e.preventDefault();
+      return;
+    }
+    
     // Scroll to top when card is clicked
     window.scrollTo(0, 0);
   };
@@ -200,8 +199,43 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
           height="200"
           image={imageUrl}
           alt={title}
-          sx={{ objectFit: 'cover' }}
+          sx={{ 
+            objectFit: 'cover',
+            filter: isExpired(expires_at) ? 'brightness(0.5) grayscale(0.5)' : 'none'
+          }}
         />
+        
+        {/* Tin đã hết hạn overlay */}
+        {isExpired(expires_at) && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 1
+            }}
+          >
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                color: 'white', 
+                fontWeight: 'bold',
+                textShadow: '0 0 5px rgba(0,0,0,0.7)',
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                px: 2,
+                py: 1,
+                borderRadius: 1
+              }}
+            >
+              Tin đã hết hạn
+            </Typography>
+          </Box>
+        )}
         
         {/* Transaction type badge */}
         <Chip
@@ -213,6 +247,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
             top: 12,
             left: 12,
             fontWeight: 'bold',
+            zIndex: 2
           }}
         />
         

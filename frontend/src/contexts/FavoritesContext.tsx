@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
-import { getFavorites } from '../services/api/userService';
+import userService from '../services/api/userService';
 import { toggleFavorite as toggleFavoriteAPI } from '../services/api/propertyService';
 
 // Define types for properties and favorites
@@ -54,7 +54,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
 
     setLoading(true);
     try {
-      const response = await getFavorites();
+      const response = await userService.getFavorites();
       console.log("Fetched favorites:", response);
       if (response.success && response.data) {
         // Extract property IDs from the favorite properties

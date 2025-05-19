@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { 
   AppBar, 
   Toolbar, 
@@ -18,7 +18,6 @@ import {
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  Notifications as NotificationsIcon,
   Favorite as FavoriteIcon, 
   Search as SearchIcon,
   Person as PersonIcon,
@@ -27,9 +26,11 @@ import {
   ContactSupport as ContactIcon,
   Article as NewsIcon,
   Add as AddIcon,
-  Dashboard as DashboardIcon
+  Dashboard as DashboardIcon,
+  Map as MapIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
+import NotificationMenu from './NotificationMenu';
 
 const Header: React.FC = () => {
   const theme = useTheme();
@@ -74,14 +75,45 @@ const Header: React.FC = () => {
     window.location.href = '/register';
   };
   
-  const menuItems = [
+  // Scroll to section functions
+  const scrollToSection = (sectionId: string) => {
+    const section = document.getElementById(sectionId);
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth' });
+      
+      // After scrolling down, schedule a scroll back to top after a delay
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 5000); // 5 seconds delay before scrolling back up
+    }
+  };
+
+  const handleGioiThieuClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    scrollToSection('gioi-thieu');
+  };
+
+  const handleLienHeClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    scrollToSection('lien-he');
+  };
+  
+  // Define MenuItem type
+  type MenuItem = {
+    title: string;
+    path: string;
+    icon: React.ReactNode;
+    onClick?: (e: React.MouseEvent) => void;
+  };
+
+  const menuItems: MenuItem[] = [
     { title: 'Trang chủ', path: '/', icon: <HomeIcon /> },
-    { title: 'Mua bán', path: '/mua-ban', icon: <SearchIcon /> },
-    { title: 'Cho thuê', path: '/cho-thue', icon: <HomeIcon /> },
+    { title: 'Tìm kiếm', path: '/tim-kiem', icon: <SearchIcon /> },
+    { title: 'Bản đồ', path: '/ban-do', icon: <MapIcon /> },
     { title: 'Đăng tin', path: '/dang-tin', icon: <AddIcon /> },
     { title: 'Tin tức', path: '/tin-tuc', icon: <NewsIcon /> },
-    { title: 'Giới thiệu', path: '/gioi-thieu', icon: <InfoIcon /> },
-    { title: 'Liên hệ', path: '/lien-he', icon: <ContactIcon /> },
+    { title: 'Giới thiệu', path: '#gioi-thieu', icon: <InfoIcon />, onClick: handleGioiThieuClick },
+    { title: 'Liên hệ', path: '#lien-he', icon: <ContactIcon />, onClick: handleLienHeClick },
   ];
 
   // Avatar rendering with cache busting
@@ -227,7 +259,7 @@ const Header: React.FC = () => {
             }}
           >
             <HomeIcon sx={{ mr: 1 }} />
-            BDSN Việt Nam
+            BĐS Việt Nam
           </Typography>
           
           {/* Desktop Navigation */}
@@ -245,10 +277,15 @@ const Header: React.FC = () => {
               {menuItems.map((item) => (
                 <Button
                   key={item.path}
-                  component={Link}
-                  to={item.path}
+                  component={item.onClick ? 'button' : Link}
+                  to={item.onClick ? undefined : item.path}
+                  onClick={item.onClick}
                   sx={navButtonStyle}
-                  className={location.pathname === item.path ? 'active' : ''}
+                  className={
+                    item.path.startsWith('#') 
+                      ? location.hash === item.path ? 'active' : ''
+                      : location.pathname === item.path ? 'active' : ''
+                  }
                 >
                   {item.title}
                 </Button>
@@ -281,16 +318,7 @@ const Header: React.FC = () => {
                     </Badge>
                   </IconButton>
                   
-                  <IconButton 
-                    component={Link} 
-                    to="/thong-bao"
-                    color="primary"
-                    sx={{ ...iconButtonStyle, mr: 2 }}
-                  >
-                    <Badge badgeContent={5} color="secondary">
-                      <NotificationsIcon />
-                    </Badge>
-                  </IconButton>
+                  <NotificationMenu />
                   
                   <IconButton
                     onClick={handleUserMenuOpen}
@@ -493,39 +521,74 @@ const Header: React.FC = () => {
                   }
                 }}
               >
-                {menuItems.map((item) => (
-                  <MenuItem
-                    key={item.path}
-                    component={Link}
-                    to={item.path}
-                    onClick={handleMobileMenuClose}
-                    sx={{ 
-                      py: 1.5, 
-                      lineHeight: 1, 
-                      whiteSpace: 'nowrap',
-                      borderLeft: location.pathname === item.path ? '3px solid' : '3px solid transparent',
-                      borderColor: location.pathname === item.path ? 'primary.main' : 'transparent',
-                      bgcolor: location.pathname === item.path ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
-                      pl: location.pathname === item.path ? 2 : 2.3,
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    {React.cloneElement(item.icon, { 
-                      color: location.pathname === item.path ? 'primary' : 'inherit',
-                      sx: { fontSize: '1.2rem' }
-                    })}
-                    <Typography 
-                      sx={{ 
-                        ml: 1.5, 
-                        lineHeight: 1,
-                        fontWeight: location.pathname === item.path ? 600 : 400,
-                        color: location.pathname === item.path ? 'primary.main' : 'inherit'
+                {menuItems.map((item) => {
+                  // Common styling for menu items
+                  const menuItemSx = {
+                    py: 1.5, 
+                    lineHeight: 1, 
+                    whiteSpace: 'nowrap',
+                    borderLeft: (item.path.startsWith('#') ? location.hash === item.path : location.pathname === item.path) 
+                      ? '3px solid' 
+                      : '3px solid transparent',
+                    borderColor: (item.path.startsWith('#') ? location.hash === item.path : location.pathname === item.path) 
+                      ? 'primary.main' 
+                      : 'transparent',
+                    bgcolor: (item.path.startsWith('#') ? location.hash === item.path : location.pathname === item.path) 
+                      ? 'rgba(25, 118, 210, 0.08)' 
+                      : 'transparent',
+                    pl: (item.path.startsWith('#') ? location.hash === item.path : location.pathname === item.path) 
+                      ? 2 
+                      : 2.3,
+                    transition: 'all 0.2s ease'
+                  };
+
+                  // Menu item content (icon and text)
+                  const menuItemContent = (
+                    <>
+                      {React.isValidElement(item.icon) ? 
+                        React.cloneElement(item.icon, {
+                          ...(location.pathname === item.path ? {color: 'primary'} : {color: 'inherit'}) as any,
+                          sx: { fontSize: '1.2rem' }
+                        }) : 
+                        item.icon
+                      }
+                      <Typography 
+                        sx={{ 
+                          ml: 1.5, 
+                          lineHeight: 1,
+                          fontWeight: location.pathname === item.path ? 600 : 400,
+                          color: location.pathname === item.path ? 'primary.main' : 'inherit'
+                        }}
+                      >
+                        {item.title}
+                      </Typography>
+                    </>
+                  );
+                  
+                  // Return the appropriate MenuItem based on whether it has onClick or not
+                  return item.onClick ? (
+                    <MenuItem
+                      key={item.path}
+                      onClick={(e: React.MouseEvent<HTMLLIElement>) => {
+                        item.onClick && item.onClick(e);
+                        handleMobileMenuClose();
                       }}
+                      sx={menuItemSx}
                     >
-                      {item.title}
-                    </Typography>
-                  </MenuItem>
-                ))}
+                      {menuItemContent}
+                    </MenuItem>
+                  ) : (
+                    <MenuItem
+                      key={item.path}
+                      component={Link}
+                      to={item.path}
+                      onClick={() => handleMobileMenuClose()}
+                      sx={menuItemSx}
+                    >
+                      {menuItemContent}
+                    </MenuItem>
+                  );
+                })}
                 
                 {/* Admin Dashboard Link in Mobile Menu - Only visible for admin users */}
                 {isAuthenticated && user?.role === 'admin' && (

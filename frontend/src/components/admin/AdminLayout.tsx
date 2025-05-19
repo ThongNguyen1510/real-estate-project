@@ -283,16 +283,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, title }) => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
-          width: { md: `calc(100% - ${open ? drawerWidth : 0}px)` },
-          ml: { md: open ? `${drawerWidth}px` : 0 },
-          transition: theme.transitions.create(['margin', 'width'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
-          }),
+          p: { xs: 2, sm: 3 },
+          pl: { sm: `${drawerWidth + 10}px` },
+          width: { sm: `calc(100% - ${drawerWidth}px)` }
         }}
       >
-        <Box sx={{ ...theme.mixins.toolbar }} /> {/* Spacing for AppBar */}
+        <Toolbar />
         
         {/* Breadcrumbs */}
         <Breadcrumbs 

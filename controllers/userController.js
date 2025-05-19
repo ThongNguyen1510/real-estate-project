@@ -1021,6 +1021,98 @@ const getUserById = async (req, res) => {
     }
 };
 
+// Đếm số lượng tin đăng của người dùng
+const getUserPropertyCount = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        const result = await sql.query`
+            SELECT COUNT(*) as count
+            FROM Properties
+            WHERE user_id = ${userId}
+        `;
+        
+        res.status(200).json({
+            success: true,
+            data: {
+                count: result.recordset[0].count
+            }
+        });
+    } catch (error) {
+        console.error('Lỗi đếm tin đăng:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server',
+            error: error.message
+        });
+    }
+};
+
+// Đếm số lượng tin yêu thích của người dùng
+const getUserFavoriteCount = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        const result = await sql.query`
+            SELECT COUNT(*) as count
+            FROM Favorites
+            WHERE user_id = ${userId}
+        `;
+        
+        res.status(200).json({
+            success: true,
+            data: {
+                count: result.recordset[0].count
+            }
+        });
+    } catch (error) {
+        console.error('Lỗi đếm tin yêu thích:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server',
+            error: error.message
+        });
+    }
+};
+
+// Get user count - used for admin notifications
+const getUserCount = async (req, res) => {
+  try {
+    // Check if user is admin
+    if (!req.user.is_admin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền truy cập tính năng này'
+      });
+    }
+
+    const { sql } = require('../config/database');
+    const request = new sql.Request();
+    
+    // Get count of active users
+    const result = await request.query(`
+      SELECT COUNT(*) as count FROM Users
+      WHERE is_active = 1
+    `);
+    
+    const count = result.recordset[0].count;
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        count: count
+      }
+    });
+  } catch (error) {
+    console.error('Error getting user count:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Đã xảy ra lỗi khi lấy số lượng người dùng',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
     registerUser,
     loginUser,
@@ -1045,5 +1137,8 @@ module.exports = {
     addToFavorites,
     removeFromFavorites,
     updateAvatar,
-    getUserById
+    getUserById,
+    getUserPropertyCount,
+    getUserFavoriteCount,
+    getUserCount
 };

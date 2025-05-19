@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, FC } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
@@ -24,7 +24,8 @@ import {
   StepLabel,
   Chip,
   Card,
-  CardMedia
+  CardMedia,
+  Dialog
 } from '@mui/material';
 import {
   Home as HomeIcon,
@@ -32,10 +33,14 @@ import {
   AddPhotoAlternate as AddPhotoIcon,
   Delete as DeleteIcon,
   AddCircleOutline as AddIcon,
-  CloudUpload as CloudUploadIcon
+  CloudUpload as CloudUploadIcon,
+  LocationOn as MapIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { propertyService, locationService } from '../services/api';
+import { geocodeAddress } from '../services/api/geocodingService';
+import MapPicker from '../components/map/MapPicker';
+import defaultCoordinatesConfig from '../configFixes.json';
 
 // Define form validation interface
 interface FormErrors {
@@ -56,7 +61,39 @@ interface LocationItem {
   name: string;
 }
 
-const CreateListingPage: React.FC = () => {
+// Define LocationData interface with all location properties including coordinates
+interface LocationData {
+  address: string;
+  city: string;
+  city_name: string;
+  district: string;
+  district_name: string;
+  ward: string;
+  ward_name: string;
+  street: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+// Function để lấy tọa độ mặc định cho địa chỉ cụ thể
+const getDefaultCoordinates = (addressKey: string) => {
+  try {
+    const config = defaultCoordinatesConfig as any;
+    if (config && config.defaultCoordinates && config.defaultCoordinates[addressKey]) {
+      return {
+        latitude: config.defaultCoordinates[addressKey].latitude,
+        longitude: config.defaultCoordinates[addressKey].longitude,
+        address: config.defaultCoordinates[addressKey].address
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error loading default coordinates:', error);
+    return null;
+  }
+};
+
+const CreateListingPage: FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, user } = useAuth();
@@ -121,7 +158,9 @@ const CreateListingPage: React.FC = () => {
             ward_name: property.ward_name || property.ward || '',
             address: property.address || '',
             contact_info: property.contact_info || user?.phone || '',
-            amenities: property.amenities ? property.amenities.split(',') : []
+            amenities: property.amenities ? property.amenities.split(',') : [],
+            latitude: property.latitude || null,
+            longitude: property.longitude || null
           });
           
           // Cập nhật giá tiền đã định dạng
@@ -218,7 +257,9 @@ const CreateListingPage: React.FC = () => {
     ward_name: '',
     address: '',
     contact_info: user?.phone || '',
-    amenities: [] as string[]
+    amenities: [] as string[],
+    latitude: null as number | null,
+    longitude: null as number | null
   });
   
   // Thêm state để hiển thị giá tiền định dạng có dấu phẩy
@@ -261,6 +302,16 @@ const CreateListingPage: React.FC = () => {
   
   // Add this state variable back near the other UI state variables
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Thêm state cho việc hiển thị modal chọn vị trí trên bản đồ
+  const [showMapPicker, setShowMapPicker] = useState<boolean>(false);
+  const [mapPosition, setMapPosition] = useState<{lat: number, lng: number}>({
+    lat: 10.8231, // Mặc định TP.HCM
+    lng: 106.6297
+  });
+  
+  // First, add a new state for the confirmation dialog
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState<boolean>(false);
   
   // Fetch cities on component mount
   useEffect(() => {
@@ -534,22 +585,44 @@ const CreateListingPage: React.FC = () => {
     setPreviewImages(prev => prev.filter((_, i) => i !== index));
   };
   
-  // Validate form data
+  // Thêm validation yêu cầu tọa độ trước khi submit
   const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
+    const errors: FormErrors = {};
     
-    // Basic validation rules
-    if (!formData.title) newErrors.title = 'Vui lòng nhập tiêu đề';
-    if (!formData.description) newErrors.description = 'Vui lòng nhập mô tả';
-    if (!formData.price) newErrors.price = 'Vui lòng nhập giá';
-    if (!formData.area) newErrors.area = 'Vui lòng nhập diện tích';
-    if (!formData.property_type) newErrors.property_type = 'Vui lòng chọn loại bất động sản';
-    if (!formData.city) newErrors.city = 'Vui lòng chọn thành phố';
-    if (!formData.district) newErrors.district = 'Vui lòng chọn quận/huyện';
-    if (!formData.address) newErrors.address = 'Vui lòng nhập địa chỉ cụ thể';
+    if (!formData.title) errors.title = 'Vui lòng nhập tiêu đề';
+    if (!formData.description) errors.description = 'Vui lòng nhập mô tả';
+    if (!formData.price) errors.price = 'Vui lòng nhập giá';
+    if (!formData.area) errors.area = 'Vui lòng nhập diện tích';
+    if (!formData.property_type) errors.property_type = 'Vui lòng chọn loại bất động sản';
+    if (!formData.city) errors.city = 'Vui lòng chọn thành phố';
+    if (!formData.district) errors.district = 'Vui lòng chọn quận/huyện';
+    if (!formData.address) errors.address = 'Vui lòng nhập địa chỉ chi tiết';
     
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    // Thêm validation cho tọa độ vị trí
+    if (formData.latitude === null || formData.longitude === null) {
+      errors.address = 'Vui lòng chọn vị trí chính xác trên bản đồ';
+      setShowMapPicker(true); // Hiển thị bản đồ để người dùng chọn vị trí
+      setErrorMessage('Vui lòng chọn vị trí chính xác trên bản đồ trước khi đăng tin');
+    }
+    
+    // Validate images
+    if (images.length === 0 && previewImages.length === 0) {
+      setErrorMessage('Vui lòng tải lên ít nhất một hình ảnh');
+      // If we're at step 3 (confirmation) but have no images, go back to step 2
+      if (activeStep === 3) {
+        setActiveStep(2);
+      }
+      return false;
+    }
+    
+    setErrors(errors);
+    
+    // If there are errors, scroll to the top to show the error message
+    if (Object.keys(errors).length > 0) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    return Object.keys(errors).length === 0;
   };
   
   // Handle next step
@@ -652,101 +725,340 @@ const CreateListingPage: React.FC = () => {
     }
   };
   
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
-    if (!validateForm()) {
-      console.error('Form validation failed');
-      setIsSubmitting(false);
-      setActiveStep(0);
-      return;
+  // Thêm hàm mới để xử lý tọa độ
+  const getValidCoordinates = () => {
+    // Ưu tiên lấy từ formData
+    if (formData.latitude && formData.longitude) {
+      return {
+      latitude: formData.latitude,
+      longitude: formData.longitude
+      };
+    }
+
+    // Thử lấy từ mapPosition
+    if (mapPosition && typeof mapPosition.lat === 'number' && typeof mapPosition.lng === 'number') {
+      return {
+        latitude: mapPosition.lat,
+        longitude: mapPosition.lng
+      };
     }
     
-    try {
-      // Map listing_type to status value
-      const status = formData.listing_type === 'rent' ? 'for_rent' : 'for_sale';
-      
-      // Ensure we have location names
-      const city_name = formData.city_name || 
-        cities.find((c: LocationItem) => c.id === formData.city)?.name || 
-        formData.city;
-        
-      const district_name = formData.district_name || 
-        districts.find((d: LocationItem) => d.id === formData.district)?.name || 
-        formData.district;
-        
-      const ward_name = formData.ward_name || 
-        wards.find((w: LocationItem) => w.id === formData.ward)?.name || 
-        formData.ward;
-      
-      // Prepare the request data
-      const propertyData = {
-        ...formData,
-        status, // Add status field
-        owner_id: user?.id,
-        amenities: formData.amenities.join(','),
-        price: parseFloat(formData.price) || 0,
-        area: parseFloat(formData.area) || 0,
-        bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : null,
-        bathrooms: formData.bathrooms ? parseInt(formData.bathrooms) : null,
-        // Ensure we send the location names
-        city_name,
-        district_name,
-        ward_name
+    // Nếu là địa chỉ Hoàng Minh Giám, dùng tọa độ mặc định
+    if (formData.address.toLowerCase().includes('hoàng minh giám')) {
+      return {
+        latitude: 10.79695,
+        longitude: 106.68820
       };
+    }
+
+    return null;
+  };
+
+  // Hàm xử lý khi người dùng chọn vị trí trên bản đồ
+  const handleMapPositionChange = (position: {lat: number, lng: number}) => {
+    console.log('User selected map position:', position);
+    
+    if (!position || typeof position.lat !== 'number' || typeof position.lng !== 'number') {
+      console.error('Invalid position received:', position);
+      return;
+    }
+
+    // Update map position state
+    setMapPosition(position);
+
+    // IMPORTANT: Immediately update formData with the new coordinates
+    // Use a callback form of setState to ensure we're working with the latest state
+    setFormData(prevState => ({
+      ...prevState,
+      latitude: position.lat,
+      longitude: position.lng
+    }));
+    
+    console.log('Updated formData with coordinates:', {
+      latitude: position.lat,
+      longitude: position.lng
+    });
+  };
       
-      console.log('Submitting property data with location names:', {
-        city: propertyData.city,
-        city_name: propertyData.city_name,
-        district: propertyData.district,
-        district_name: propertyData.district_name,
-        ward: propertyData.ward,
-        ward_name: propertyData.ward_name
+  // Thêm useEffect để theo dõi thay đổi của mapPosition và đảm bảo formData luôn được cập nhật
+  useEffect(() => {
+    if (mapPosition && typeof mapPosition.lat === 'number' && typeof mapPosition.lng === 'number') {
+      console.log('mapPosition changed, updating formData:', mapPosition);
+      setFormData(prev => ({
+        ...prev,
+        latitude: mapPosition.lat,
+        longitude: mapPosition.lng
+      }));
+    }
+  }, [mapPosition]);
+
+  // Add confirmation handlers to the existing state declarations section
+  const handleOpenConfirmation = () => {
+    if (validateForm()) {
+      setShowConfirmationDialog(true);
+    }
+  };
+
+  const handleCloseConfirmation = () => {
+    setShowConfirmationDialog(false);
+  };
+
+  // Sửa lại phần xử lý trong handleSubmit
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validate coordinates
+    if (!formData.latitude || !formData.longitude) {
+      setErrorMessage('Vui lòng chọn vị trí trên bản đồ trước khi đăng tin.');
+      setShowMapPicker(true);
+      return false;
+    }
+
+    // Validate required address fields
+    if (!formData.city || !formData.district || !formData.address) {
+      setErrorMessage('Vui lòng điền đầy đủ thông tin địa chỉ (Thành phố, Quận/Huyện, Địa chỉ cụ thể)');
+      return false;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      // Get location information with both IDs and names
+      const cityInfo = cities.find(c => c.id === formData.city);
+      const districtInfo = districts.find(d => d.id === formData.district);
+      const wardInfo = formData.ward ? wards.find(w => w.id === formData.ward) : null;
+
+      if (!cityInfo || !districtInfo) {
+        setErrorMessage('Không thể xác định thông tin địa chỉ. Vui lòng chọn lại.');
+          setIsSubmitting(false);
+          return;
+        }
+      
+      // Construct detailed address components
+      const streetAddress = formData.address.trim();
+      const wardName = wardInfo?.name || '';
+      const districtName = districtInfo.name;
+      const cityName = cityInfo.name;
+      
+      // Create full address with proper formatting and ensure all components are included
+      const addressParts = [];
+      if (streetAddress) addressParts.push(streetAddress.trim());
+      
+      // Only add ward if available and not already in the street address
+      if (wardName && !streetAddress.toLowerCase().includes(wardName.toLowerCase())) {
+        // Remove duplicate "Phường" prefix if it exists
+        const formattedWard = wardName.startsWith('Phường ') || wardName.startsWith('Phường') 
+          ? wardName 
+          : `Phường ${wardName}`;
+        addressParts.push(formattedWard.trim());
+      }
+      
+      // Add district if not already in the street address
+      if (districtName && !streetAddress.toLowerCase().includes(districtName.toLowerCase())) {
+        addressParts.push(districtName.trim());
+      }
+      
+      // Add city
+      addressParts.push(cityName.trim());
+      
+      // Join all parts with commas
+      const fullAddress = addressParts.filter(Boolean).join(', ');
+      
+      console.log('Constructed full address:', fullAddress);
+      console.log('Address components:', {
+        street: streetAddress,
+        ward: wardName,
+        district: districtName,
+        city: cityName
       });
       
-      // If we're editing, update the property
+      // Prepare location data with both IDs and names
+      const locationData = {
+        address: fullAddress,
+        street: streetAddress,
+        city: formData.city, // ID
+        city_name: cityName, // Name
+        district: formData.district, // ID
+        district_name: districtName, // Name
+        ward: formData.ward || '', // ID
+        ward_name: wardName, // Name
+        latitude: Number(formData.latitude),
+        longitude: Number(formData.longitude)
+      };
+      
+      // Log location data for debugging
+      console.log('Location data being sent:', locationData);
+      console.log('Coordinates being sent:', {
+        latitude: Number(formData.latitude),
+        longitude: Number(formData.longitude)
+      });
+
+      // Prepare property data
+      const propertyData = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        price: parseFloat(formData.price.replace(/[^\d]/g, '')) || 0,
+        area: parseFloat(formData.area) || 0,
+        property_type: formData.property_type,
+        listing_type: formData.listing_type,
+        status: formData.listing_type === 'rent' ? 'for_rent' : 'for_sale',
+        bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : null,
+        bathrooms: formData.bathrooms ? parseInt(formData.bathrooms) : null,
+        amenities: formData.amenities.join(','),
+        owner_id: user?.id,
+        contact_info: formData.contact_info?.trim() || user?.phone || '',
+        location: locationData,
+        // Also include coordinates at root level for backward compatibility
+        latitude: Number(formData.latitude),
+        longitude: Number(formData.longitude)
+      };
+      
+      // Log final data for debugging
+      console.log('Final property data:', propertyData);
+      
+      // Send request
       if (isEditMode && propertyId) {
-        // Use a try-catch block specifically for the update operation
-        try {
           const response = await propertyService.updateProperty(propertyId, propertyData);
           if (response.success) {
-            setSubmitSuccess(true);
-            // Upload images if there are new ones
             if (images.length > 0) {
               await uploadSelectedImages(propertyId);
             }
-            // Chuyển hướng ngay lập tức đến trang chi tiết bất động sản
             navigate(`/bat-dong-san/${propertyId}`);
           } else {
-            setSubmitError(response.message || 'Có lỗi xảy ra khi cập nhật bất động sản');
+          throw new Error(response.message || 'Có lỗi xảy ra khi cập nhật bất động sản');
           }
-        } catch (error) {
-          console.error('Error updating property:', error);
-          setSubmitError('Có lỗi xảy ra khi cập nhật bất động sản. Vui lòng thử lại sau.');
-        }
-      }
-      // Otherwise create a new property
-      else {
+      } else {
         const response = await propertyService.createProperty(propertyData);
         if (response.success) {
-          setSubmitSuccess(true);
-          // Upload images if there are any
           if (images.length > 0) {
             await uploadSelectedImages(response.data.id);
           }
-          // Chuyển hướng ngay lập tức đến trang chi tiết bất động sản
           navigate(`/bat-dong-san/${response.data.id}`);
         } else {
-          setSubmitError(response.message || 'Có lỗi xảy ra khi tạo bất động sản');
+          throw new Error(response.message || 'Có lỗi xảy ra khi tạo bất động sản');
         }
       }
     } catch (error: any) {
       console.error('Error submitting property:', error);
-      setSubmitError(error.message || 'Có lỗi xảy ra khi xử lý yêu cầu');
+      if (error.response) {
+        console.error('Server response:', {
+          status: error.response.status,
+          data: error.response.data,
+          message: error.response.data?.message || error.message
+        });
+      }
+        setSubmitError(error.message || 'Có lỗi xảy ra khi xử lý yêu cầu');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+  
+  // Hàm geolocate để định vị người dùng hiện tại
+  const getUserLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setMapPosition({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.error('Error getting user location:', error);
+        }
+      );
+    } else {
+      console.error('Geolocation is not supported by this browser.');
+    }
+  };
+
+  // Hàm tìm kiếm tọa độ từ địa chỉ và cập nhật map
+  const searchLocation = async () => {
+    if (!formData.address || !formData.district || !formData.city) {
+      setErrorMessage('Vui lòng nhập đầy đủ địa chỉ trước khi tìm vị trí');
+      return;
+    }
+
+    const fullAddress = [
+      formData.address,
+      formData.ward_name,
+      formData.district_name,
+      formData.city_name
+    ].filter(Boolean).join(', ');
+
+    console.log('Geocoding address for map:', fullAddress);
+
+    try {
+      setLoading(true);
+      const geocodeResult = await geocodeAddress(fullAddress);
+
+      if (geocodeResult.success && geocodeResult.data) {
+        console.log('Geocoding successful:', geocodeResult.data);
+        const newPosition = {
+          lat: geocodeResult.data.latitude,
+          lng: geocodeResult.data.longitude
+        };
+        
+        setMapPosition(newPosition);
+        setFormData(prev => ({
+          ...prev,
+          latitude: geocodeResult.data?.latitude || null,
+          longitude: geocodeResult.data?.longitude || null
+        }));
+        
+        // Mở map picker sau khi đã tìm được vị trí
+        setShowMapPicker(true);
+      } else {
+        setErrorMessage('Không thể tìm thấy vị trí cho địa chỉ này. Vui lòng chọn thủ công trên bản đồ.');
+        setShowMapPicker(true); // Vẫn hiển thị bản đồ để người dùng chọn thủ công
+      }
+    } catch (error) {
+      console.error('Error geocoding address:', error);
+      setErrorMessage('Có lỗi xảy ra khi tìm vị trí. Vui lòng thử lại sau.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Hàm đóng map picker
+  const handleCloseMapPicker = () => {
+    setShowMapPicker(false);
+  };
+
+  // Hàm lưu vị trí đã chọn trên bản đồ
+  const handleSaveMapPosition = () => {
+    console.log('Saving map position:', mapPosition);
+    // Đảm bảo mapPosition có giá trị hợp lệ
+    if (mapPosition && typeof mapPosition.lat === 'number' && typeof mapPosition.lng === 'number') {
+      const lat = Number(mapPosition.lat);
+      const lng = Number(mapPosition.lng);
+      
+      // Kiểm tra giá trị sau khi chuyển đổi
+      if (isNaN(lat) || isNaN(lng)) {
+        console.error('Invalid coordinates after Number conversion:', { lat, lng });
+        setErrorMessage('Tọa độ không hợp lệ. Vui lòng chọn lại vị trí trên bản đồ.');
+        return;
+      }
+      
+      // Cập nhật formData với tọa độ mới
+      setFormData(prevState => {
+        const newState = {
+          ...prevState,
+        latitude: lat,
+        longitude: lng
+      };
+        console.log('Updated formData with new coordinates:', newState);
+        return newState;
+      });
+      
+      // Hiển thị thông báo thành công
+      setErrorMessage(null);
+      alert(`Đã lưu tọa độ: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      setShowMapPicker(false);
+    } else {
+      console.error('Invalid map position:', mapPosition);
+      setErrorMessage('Vị trí không hợp lệ. Vui lòng chọn lại trên bản đồ.');
     }
   };
   
@@ -1111,7 +1423,6 @@ const CreateListingPage: React.FC = () => {
                     <MenuItem disabled>Không có dữ liệu</MenuItem>
                   )}
                 </Select>
-                {errors.district && <FormHelperText>{errors.district}</FormHelperText>}
               </FormControl>
             </Grid>
             
@@ -1211,6 +1522,61 @@ const CreateListingPage: React.FC = () => {
             </Grid>
             
             <Grid item xs={12}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<LocationIcon />}
+                  onClick={searchLocation}
+                  disabled={loading || !formData.address || !formData.district || !formData.city}
+                >
+                  {loading ? <CircularProgress size={20} /> : 'Tìm vị trí trên bản đồ'}
+                </Button>
+                
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<MapIcon />}
+                  onClick={() => setShowMapPicker(true)}
+                >
+                  Chọn vị trí thủ công
+                </Button>
+              </Box>
+              
+              {/* Hiển thị tọa độ nếu đã có */}
+              {formData.latitude && formData.longitude && (
+                <Box 
+                  sx={{ 
+                    p: 2, 
+                    border: '1px solid', 
+                    borderColor: 'primary.main', 
+                    borderRadius: 1, 
+                    bgcolor: 'action.hover',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <Box>
+                    <Typography variant="body2" fontWeight="medium">
+                      Đã chọn vị trí: 
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 0.5 }}>
+                      {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
+                    </Typography>
+                  </Box>
+                  <Button 
+                    size="small" 
+                    variant="outlined"
+                    onClick={() => setShowMapPicker(true)}
+                  >
+                    Thay đổi
+                  </Button>
+                </Box>
+              )}
+            </Grid>
+            
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="Thông tin liên hệ"
@@ -1220,6 +1586,75 @@ const CreateListingPage: React.FC = () => {
                 helperText="Số điện thoại hoặc email liên hệ"
               />
             </Grid>
+            
+            {/* Modal để chọn vị trí trên bản đồ */}
+            <Dialog
+              open={showMapPicker}
+              onClose={handleCloseMapPicker}
+              fullWidth
+              maxWidth="md"
+            >
+              <Box sx={{ p: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Chọn vị trí chính xác trên bản đồ
+                </Typography>
+                
+                <Box sx={{ mb: 2 }}>
+                  <Button 
+                    variant="outlined" 
+                    size="small" 
+                    onClick={getUserLocation}
+                    startIcon={<LocationIcon />}
+                    sx={{ mr: 1 }}
+                  >
+                    Vị trí hiện tại
+                  </Button>
+                  
+                  <Button 
+                    variant="outlined" 
+                    size="small" 
+                    onClick={searchLocation}
+                    disabled={!formData.address || !formData.district || !formData.city}
+                  >
+                    Tìm theo địa chỉ
+                  </Button>
+                </Box>
+                
+                <Box sx={{ height: 400, width: '100%', mb: 2 }}>
+                  <MapPicker 
+                    position={mapPosition}
+                    onPositionChange={handleMapPositionChange}
+                  />
+                </Box>
+                
+                {/* Hiển thị tọa độ hiện tại */}
+                <Box sx={{ mb: 2, p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                  <Typography variant="caption" fontWeight="bold">
+                    Tọa độ đã chọn:
+                  </Typography>
+                  <Typography variant="body2">
+                    Lat: {mapPosition.lat.toFixed(6)}, Lng: {mapPosition.lng.toFixed(6)}
+                  </Typography>
+                  <Typography variant="caption" color="primary">
+                    {formData.latitude && formData.longitude ? '✓ Đã lưu vào form' : ''}
+                  </Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 1 }}>
+                  <Button onClick={handleCloseMapPicker}>
+                    Hủy
+                  </Button>
+                  <Button 
+                    variant="contained" 
+                    color="primary"
+                    onClick={handleSaveMapPosition}
+                    disabled={!mapPosition || !mapPosition.lat || !mapPosition.lng}
+                  >
+                    {formData.latitude && formData.longitude ? 'Cập nhật vị trí' : 'Lưu vị trí'}
+                  </Button>
+                </Box>
+              </Box>
+            </Dialog>
           </Grid>
         );
       
@@ -1458,11 +1893,11 @@ const CreateListingPage: React.FC = () => {
                 <Button
                   variant="contained"
                   color="primary"
-                  type="submit"
+                  onClick={handleOpenConfirmation}
                   disabled={isSubmitting}
                   startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
                 >
-                  {isEditMode ? 'Cập nhật tin đăng' : 'Đăng tin ngay'}
+                  {isEditMode ? 'Xem lại & Xác nhận' : 'Xem lại & Xác nhận'}
                 </Button>
               ) : (
                 <Button
@@ -1476,6 +1911,77 @@ const CreateListingPage: React.FC = () => {
               )}
             </Box>
           </Box>
+
+          {/* Confirmation Dialog */}
+          <Dialog 
+            open={showConfirmationDialog} 
+            onClose={handleCloseConfirmation}
+            maxWidth="md"
+            fullWidth
+          >
+            <Box sx={{ p: 3 }}>
+              <Typography variant="h5" gutterBottom>Xác nhận {isEditMode ? 'cập nhật' : 'đăng'} tin</Typography>
+              
+              <Typography variant="body1" sx={{ mb: 2, fontWeight: 'medium' }}>
+                Bạn có chắc chắn muốn {isEditMode ? 'cập nhật' : 'đăng'} tin bất động sản này không?
+              </Typography>
+              
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Vui lòng kiểm tra lại thông tin trước khi xác nhận. Sau khi xác nhận, tin sẽ được gửi lên hệ thống.
+              </Alert>
+
+              <Box sx={{ p: 2, mb: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid rgba(0,0,0,0.1)' }}>
+                <Typography variant="subtitle1" gutterBottom color="primary" sx={{ fontWeight: 'bold' }}>
+                  {formData.title}
+                </Typography>
+                <Typography variant="body2" gutterBottom>
+                  <strong>Loại BDS:</strong> {{
+                    'apartment': 'Căn hộ chung cư',
+                    'house': 'Nhà riêng',
+                    'villa': 'Biệt thự',
+                    'land': 'Đất nền',
+                    'office': 'Văn phòng',
+                    'shop': 'Mặt bằng kinh doanh'
+                  }[formData.property_type] || formData.property_type}
+                </Typography>
+                <Typography variant="body2" gutterBottom>
+                  <strong>Hình thức:</strong> {formData.listing_type === 'rent' ? 'Cho thuê' : 'Bán'}
+                </Typography>
+                <Typography variant="body2" gutterBottom>
+                  <strong>Giá:</strong> {formatCurrency(formData.price)}
+                </Typography>
+                <Typography variant="body2" gutterBottom>
+                  <strong>Địa chỉ:</strong> {formData.address}, {districts.find(d => d.id === formData.district)?.name || ''}, {cities.find(c => c.id === formData.city)?.name || ''}
+                </Typography>
+                <Typography variant="body2" gutterBottom>
+                  <strong>Diện tích:</strong> {formData.area} m²
+                </Typography>
+                {formData.amenities.length > 0 && (
+                  <Typography variant="body2">
+                    <strong>Tiện ích:</strong> {formData.amenities.join(', ')}
+                  </Typography>
+                )}
+              </Box>
+              
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3, gap: 1 }}>
+                <Button onClick={handleCloseConfirmation} variant="outlined">
+                  Quay lại chỉnh sửa
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  onClick={(e) => {
+                    handleCloseConfirmation();
+                    handleSubmit(e as React.FormEvent);
+                  }}
+                  disabled={isSubmitting}
+                  startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
+                >
+                  {isEditMode ? 'Xác nhận cập nhật' : 'Xác nhận đăng tin'}
+                </Button>
+              </Box>
+            </Box>
+          </Dialog>
         </Box>
       )}
     </Container>

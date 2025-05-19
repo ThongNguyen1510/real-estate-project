@@ -12,11 +12,10 @@ const notificationModel = {
                 SELECT 
                     id,
                     user_id,
-                    type,
                     title,
-                    content,
-                    related_entity_type,
-                    related_entity_id,
+                    message,
+                    notification_type,
+                    reference_id,
                     is_read,
                     created_at
                 FROM Notifications
@@ -24,13 +23,13 @@ const notificationModel = {
             `;
             
             // Lọc theo đã đọc hoặc chưa đọc
-            if (params.read_status) {
+            if (params.read_status !== undefined) {
                 query += ` AND is_read = @read_status`;
             }
             
             // Lọc theo loại thông báo
             if (params.type) {
-                query += ` AND type = @type`;
+                query += ` AND notification_type = @type`;
             }
             
             // Sắp xếp mới nhất trước
@@ -58,7 +57,7 @@ const notificationModel = {
                 FROM Notifications
                 WHERE user_id = @userId
                 ${params.read_status !== undefined ? ' AND is_read = @read_status' : ''}
-                ${params.type ? ' AND type = @type' : ''}
+                ${params.type ? ' AND notification_type = @type' : ''}
             `;
             
             const countResult = await request.query(countQuery);
@@ -99,34 +98,75 @@ const notificationModel = {
     // Tạo thông báo mới
     async createNotification(notificationData) {
         try {
-            const result = await sql.query`
+            const request = new sql.Request();
+            request.input('user_id', sql.Int, notificationData.user_id);
+            request.input('title', sql.NVarChar, notificationData.title);
+            request.input('message', sql.NVarChar, notificationData.message);
+            request.input('notification_type', sql.NVarChar, notificationData.notification_type);
+            request.input('reference_id', sql.Int, notificationData.reference_id || null);
+            
+            const result = await request.query(`
                 INSERT INTO Notifications (
                     user_id,
-                    type,
                     title,
-                    content,
-                    related_entity_type,
-                    related_entity_id,
+                    message,
+                    notification_type,
+                    reference_id,
                     is_read,
                     created_at
                 )
                 VALUES (
-                    ${notificationData.user_id},
-                    ${notificationData.type},
-                    ${notificationData.title},
-                    ${notificationData.content},
-                    ${notificationData.related_entity_type},
-                    ${notificationData.related_entity_id},
+                    @user_id,
+                    @title,
+                    @message,
+                    @notification_type,
+                    @reference_id,
                     0,
                     GETDATE()
                 );
                 
                 SELECT SCOPE_IDENTITY() AS id;
-            `;
+            `);
             
             return result.recordset[0].id;
         } catch (error) {
             console.error('Error creating notification:', error);
+            throw error;
+        }
+    },
+    
+    // Tạo thông báo về tin đăng hết hạn
+    async createPropertyExpirationNotification(property) {
+        try {
+            const notificationData = {
+                user_id: property.owner_id,
+                title: 'Tin đăng đã hết hạn',
+                message: `Tin đăng "${property.title}" của bạn đã hết hạn. Hãy gia hạn để tin tiếp tục hiển thị trên trang chủ.`,
+                notification_type: 'property_expired',
+                reference_id: property.id
+            };
+            
+            return await this.createNotification(notificationData);
+        } catch (error) {
+            console.error('Error creating property expiration notification:', error);
+            throw error;
+        }
+    },
+    
+    // Tạo thông báo cho người dùng từ thông báo admin
+    async createAdminNotification(userId, adminNotification) {
+        try {
+            const notificationData = {
+                user_id: userId,
+                title: adminNotification.title,
+                message: adminNotification.message,
+                notification_type: 'admin',
+                reference_id: adminNotification.id
+            };
+            
+            return await this.createNotification(notificationData);
+        } catch (error) {
+            console.error('Error creating admin notification for user:', error);
             throw error;
         }
     },
@@ -191,9 +231,8 @@ const notificationModel = {
                     email_notifications,
                     push_notifications,
                     sms_notifications,
-                    marketing_notifications,
-                    property_updates,
-                    messages,
+                    property_expiration_notifications,
+                    admin_notifications,
                     system_notifications
                 FROM NotificationSettings
                 WHERE user_id = ${userId}
@@ -206,9 +245,8 @@ const notificationModel = {
                     email_notifications: true,
                     push_notifications: true,
                     sms_notifications: false,
-                    marketing_notifications: true,
-                    property_updates: true,
-                    messages: true,
+                    property_expiration_notifications: true,
+                    admin_notifications: true,
                     system_notifications: true
                 };
             }
@@ -229,17 +267,15 @@ const notificationModel = {
                     email_notifications,
                     push_notifications,
                     sms_notifications,
-                    marketing_notifications,
-                    property_updates,
-                    messages,
+                    property_expiration_notifications,
+                    admin_notifications,
                     system_notifications,
-                    created_at,
                     updated_at
                 )
                 VALUES (
                     ${userId},
-                    1, 1, 0, 1, 1, 1, 1,
-                    GETDATE(), GETDATE()
+                    1, 1, 0, 1, 1, 1,
+                    GETDATE()
                 )
             `;
             
@@ -253,26 +289,24 @@ const notificationModel = {
     // Cập nhật cài đặt thông báo
     async updateNotificationSettings(userId, settings) {
         try {
-            // Kiểm tra xem cài đặt đã tồn tại chưa
+            // Kiểm tra settings có tồn tại không
             const checkResult = await sql.query`
-                SELECT COUNT(*) AS count
+                SELECT COUNT(*) as count
                 FROM NotificationSettings
                 WHERE user_id = ${userId}
             `;
             
+            // Nếu không tồn tại thì tạo mới
             if (checkResult.recordset[0].count === 0) {
-                // Tạo mới cài đặt
                 await sql.query`
                     INSERT INTO NotificationSettings (
                         user_id,
                         email_notifications,
                         push_notifications,
                         sms_notifications,
-                        marketing_notifications,
-                        property_updates,
-                        messages,
+                        property_expiration_notifications,
+                        admin_notifications,
                         system_notifications,
-                        created_at,
                         updated_at
                     )
                     VALUES (
@@ -280,24 +314,22 @@ const notificationModel = {
                         ${settings.email_notifications ? 1 : 0},
                         ${settings.push_notifications ? 1 : 0},
                         ${settings.sms_notifications ? 1 : 0},
-                        ${settings.marketing_notifications ? 1 : 0},
-                        ${settings.property_updates ? 1 : 0},
-                        ${settings.messages ? 1 : 0},
+                        ${settings.property_expiration_notifications ? 1 : 0},
+                        ${settings.admin_notifications ? 1 : 0},
                         ${settings.system_notifications ? 1 : 0},
-                        GETDATE(), GETDATE()
+                        GETDATE()
                     )
                 `;
             } else {
-                // Cập nhật cài đặt hiện có
+                // Nếu tồn tại thì cập nhật
                 await sql.query`
                     UPDATE NotificationSettings
                     SET 
                         email_notifications = ${settings.email_notifications ? 1 : 0},
                         push_notifications = ${settings.push_notifications ? 1 : 0},
                         sms_notifications = ${settings.sms_notifications ? 1 : 0},
-                        marketing_notifications = ${settings.marketing_notifications ? 1 : 0},
-                        property_updates = ${settings.property_updates ? 1 : 0},
-                        messages = ${settings.messages ? 1 : 0},
+                        property_expiration_notifications = ${settings.property_expiration_notifications ? 1 : 0},
+                        admin_notifications = ${settings.admin_notifications ? 1 : 0},
                         system_notifications = ${settings.system_notifications ? 1 : 0},
                         updated_at = GETDATE()
                     WHERE user_id = ${userId}

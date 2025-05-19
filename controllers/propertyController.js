@@ -1,5 +1,6 @@
 const { connectToDatabase, sql } = require('../config/database');
 const jwt = require("jsonwebtoken");
+const { getCoordinatesFromAddress } = require('../utils/geocodingUtils');
 
 const JWT_SECRET = process.env.JWT_SECRET; // Sử dụng biến môi trường
 
@@ -48,9 +49,13 @@ async function getProperties(req, res) {
     // Build the WHERE clause based on filters
     let whereClause = 'WHERE 1=1';
 
-    // Luôn lọc bất động sản có status là available
+    // Luôn lọc bất động sản có status là available và chưa hết hạn
     whereClause += ' AND p.status = @status';
     request.input('status', sql.NVarChar, 'available');
+    
+    // Lọc các tin đã hết hạn
+    whereClause += ' AND (p.expires_at IS NULL OR p.expires_at > @currentDate)';
+    request.input('currentDate', sql.DateTime, new Date());
 
     if (req.query.property_type) {
       whereClause += ' AND p.property_type = @property_type';
@@ -100,6 +105,53 @@ async function getProperties(req, res) {
       }
     }
 
+    // Filter by city
+    if (req.query.city) {
+      whereClause += ' AND l.city = @city';
+      request.input('city', sql.NVarChar, req.query.city);
+    }
+
+    // Filter by district
+    if (req.query.district) {
+      whereClause += ' AND l.district = @district';
+      request.input('district', sql.NVarChar, req.query.district);
+    }
+
+    // Filter by ward
+    if (req.query.ward) {
+      whereClause += ' AND l.ward = @ward';
+      request.input('ward', sql.NVarChar, req.query.ward);
+    }
+    
+    // Filter by owner_id
+    if (req.query.owner_id) {
+      whereClause += ' AND p.owner_id = @owner_id';
+      request.input('owner_id', sql.Int, parseInt(req.query.owner_id));
+    }
+    
+    // Filter properties with coordinates if requested for map search
+    if (req.query.has_coordinates === 'true') {
+      whereClause += ' AND l.latitude IS NOT NULL AND l.longitude IS NOT NULL';
+    }
+    
+    // Filter by distance from a point (for map search)
+    if (req.query.latitude && req.query.longitude && req.query.distance) {
+      const lat = parseFloat(req.query.latitude);
+      const lng = parseFloat(req.query.longitude);
+      const distance = parseFloat(req.query.distance); // distance in kilometers
+      
+      // Calculate distances using Haversine formula directly in SQL
+      whereClause += ` AND
+        (6371 * ACOS(
+          COS(RADIANS(@lat)) * COS(RADIANS(l.latitude)) * COS(RADIANS(l.longitude) - RADIANS(@lng)) + 
+          SIN(RADIANS(@lat)) * SIN(RADIANS(l.latitude))
+        )) <= @distance`;
+      
+      request.input('lat', sql.Float, lat);
+      request.input('lng', sql.Float, lng);
+      request.input('distance', sql.Float, distance);
+    }
+
     // Add pagination parameters
     request.input('offset', sql.Int, offset);
     request.input('fetch', sql.Int, limit);
@@ -108,6 +160,7 @@ async function getProperties(req, res) {
     const countQuery = `
       SELECT COUNT(*) as total
       FROM Properties p
+      LEFT JOIN Locations l ON p.location_id = l.id
       ${whereClause}
     `;
     
@@ -435,23 +488,107 @@ async function createProperty(req, res) {
 
       // Log để debug
       console.log("DEBUG - Location data received:", location);
+      console.log("DEBUG - Raw location data from request:", JSON.stringify(req.body.location));
+      console.log("DEBUG - Root level coordinates:", { 
+        latitude: req.body.latitude,
+        longitude: req.body.longitude,
+        latType: typeof req.body.latitude,
+        lngType: typeof req.body.longitude
+      });
 
-      // Xử lý tọa độ đặc biệt - đảm bảo có giá trị
-      // Gán giá trị cố định cho Hà Nội nếu không có tọa độ
-      let latitude = 21.0285;  // Giá trị mặc định cho Hà Nội
-      let longitude = 105.8542; // Giá trị mặc định cho Hà Nội
+      // Xử lý tọa độ - đảm bảo có giá trị hợp lệ hoặc null
+      let latitude = null;  // Mặc định là null
+      let longitude = null; // Mặc định là null
       
-      // Chỉ ghi đè nếu có giá trị hợp lệ
-      if (typeof location.latitude === 'number' && !isNaN(location.latitude)) {
-        latitude = location.latitude;
-      } else if (typeof location.latitude === 'string' && !isNaN(parseFloat(location.latitude))) {
-        latitude = parseFloat(location.latitude);
+      // Thử lấy tọa độ từ cấp root của request trước
+      if (typeof req.body.latitude === 'number' && !isNaN(req.body.latitude)) {
+        latitude = req.body.latitude;
+        console.log("DEBUG - Using numeric latitude from root:", latitude);
+      } else if (typeof req.body.latitude === 'string' && !isNaN(parseFloat(req.body.latitude))) {
+        latitude = parseFloat(req.body.latitude);
+        console.log("DEBUG - Parsed latitude from root string:", latitude);
       }
       
-      if (typeof location.longitude === 'number' && !isNaN(location.longitude)) {
-        longitude = location.longitude;
-      } else if (typeof location.longitude === 'string' && !isNaN(parseFloat(location.longitude))) {
-        longitude = parseFloat(location.longitude);
+      if (typeof req.body.longitude === 'number' && !isNaN(req.body.longitude)) {
+        longitude = req.body.longitude;
+        console.log("DEBUG - Using numeric longitude from root:", longitude);
+      } else if (typeof req.body.longitude === 'string' && !isNaN(parseFloat(req.body.longitude))) {
+        longitude = parseFloat(req.body.longitude);
+        console.log("DEBUG - Parsed longitude from root string:", longitude);
+      }
+      
+      // Nếu tọa độ từ cấp root không có giá trị, thử lấy từ location object
+      if (latitude === null || longitude === null) {
+        console.log("DEBUG - No valid coordinates at root level, checking location object");
+        
+        // Chỉ gán nếu có giá trị hợp lệ từ location object
+        if (typeof location.latitude === 'number' && !isNaN(location.latitude)) {
+          latitude = location.latitude;
+          console.log("DEBUG - Using numeric latitude from location:", latitude);
+        } else if (typeof location.latitude === 'string' && !isNaN(parseFloat(location.latitude))) {
+          latitude = parseFloat(location.latitude);
+          console.log("DEBUG - Parsed latitude from location string:", latitude);
+        }
+        
+        if (typeof location.longitude === 'number' && !isNaN(location.longitude)) {
+          longitude = location.longitude;
+          console.log("DEBUG - Using numeric longitude from location:", longitude);
+        } else if (typeof location.longitude === 'string' && !isNaN(parseFloat(location.longitude))) {
+          longitude = parseFloat(location.longitude);
+          console.log("DEBUG - Parsed longitude from location string:", longitude);
+        }
+      }
+      
+      // Kiểm tra và log tọa độ cuối cùng được gán
+      console.log("DEBUG - After parsing, coordinates:", { latitude, longitude });
+      
+      // Nếu không có tọa độ, thực hiện geocoding tự động
+      if (latitude === null || longitude === null) {
+        console.log("DEBUG - Missing coordinates, attempting to geocode address");
+        
+        // Tạo địa chỉ đầy đủ cho geocoding
+        const fullAddress = [
+          location.address,
+          location.ward_name || location.ward,
+          location.district_name || location.district,
+          location.city_name || location.city
+        ].filter(Boolean).join(', ');
+        
+        console.log("DEBUG - Geocoding full address:", fullAddress);
+        
+        try {
+          // Thực hiện geocoding
+          const geocodeResult = await getCoordinatesFromAddress(fullAddress);
+          
+          if (geocodeResult.success) {
+            latitude = geocodeResult.latitude;
+            longitude = geocodeResult.longitude;
+            console.log("DEBUG - Geocoding successful:", { latitude, longitude });
+          } else {
+            console.warn("DEBUG - Geocoding failed:", geocodeResult.message);
+            // Nếu geocode thất bại, trả về lỗi để tránh lưu null vào DB
+            return res.status(400).json({
+              success: false,
+              message: "Không thể xác định tọa độ của địa chỉ. Vui lòng chọn vị trí trên bản đồ."
+            });
+          }
+        } catch (geocodeError) {
+          console.error("DEBUG - Geocoding error:", geocodeError);
+          // Trả về lỗi thay vì tiếp tục với giá trị NULL
+          return res.status(400).json({
+            success: false,
+            message: "Lỗi khi xác định tọa độ. Vui lòng chọn vị trí chính xác trên bản đồ."
+          });
+        }
+      }
+      
+      // Cuối cùng, kiểm tra lại một lần nữa trước khi chèn vào database
+      if (latitude === null || longitude === null) {
+        console.error("DEBUG - Coordinates still null after all attempts. Cannot proceed.");
+        return res.status(400).json({
+          success: false,
+          message: "Tọa độ không thể để trống. Vui lòng chọn vị trí trên bản đồ."
+        });
       }
                        
       console.log("DEBUG - Final latitude value:", latitude);
@@ -478,8 +615,23 @@ async function createProperty(req, res) {
         request.input('district', sql.NVarChar, location.district);
         request.input('ward', sql.NVarChar, location.ward || null);
         request.input('street', sql.NVarChar, location.street || null);
+        
+        // Đảm bảo latitude và longitude là kiểu số hợp lệ trước khi chèn vào database
+        if (latitude === null || longitude === null) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: "Tọa độ không thể để trống. Vui lòng chọn vị trí trên bản đồ."
+          });
+        }
+        
+        // Convert to Decimal for SQL Server
         request.input('latitude', sql.Decimal(9,6), latitude);
         request.input('longitude', sql.Decimal(9,6), longitude);
+        
+        console.log("DEBUG - Final values for database insertion:");
+        console.log("latitude:", latitude, "type:", typeof latitude);
+        console.log("longitude:", longitude, "type:", typeof longitude);
 
         const locationQuery = `
           INSERT INTO Locations (address, city, district, ward, street, latitude, longitude)
@@ -539,17 +691,22 @@ async function createProperty(req, res) {
       request.input('images', sql.NVarChar, imagesJson);
       request.input('primary_image_url', sql.NVarChar, primaryImageUrl);
       request.input('listing_type', sql.NVarChar, normalizedListingType);
+      
+      // Tính toán ngày hết hạn (10 ngày kể từ ngày đăng)
+      const expirationDate = new Date();
+      expirationDate.setDate(expirationDate.getDate() + 10);
+      request.input('expires_at', sql.DateTime, expirationDate);
 
       const propertyQuery = `
         INSERT INTO Properties (
           title, description, price, area, property_type, bedrooms,
           bathrooms, parking_slots, amenities, owner_id, location_id,
-          status, images, primary_image_url, listing_type
+          status, images, primary_image_url, listing_type, expires_at
         )
         VALUES (
           @title, @description, @price, @area, @property_type,
           @bedrooms, @bathrooms, @parking_slots, @amenities,
-          @owner_id, @location_id, @status, @images, @primary_image_url, @listing_type
+          @owner_id, @location_id, @status, @images, @primary_image_url, @listing_type, @expires_at
         )
         SELECT SCOPE_IDENTITY() AS id
       `;
@@ -585,7 +742,8 @@ async function createProperty(req, res) {
         data: { 
           id: propertyId,
           status: propertyStatus,
-          created_at: new Date().toISOString() 
+          created_at: new Date().toISOString(),
+          expires_at: expirationDate.toISOString()
         }
       });
     } catch (error) {
@@ -649,6 +807,82 @@ async function updateProperty(req, res) {
     try {
       // Handle location update
       if (location) {
+        // Xử lý tọa độ - đảm bảo có giá trị hợp lệ hoặc null
+        let latitude = null;  // Mặc định là null
+        let longitude = null; // Mặc định là null
+        
+        // Chỉ gán nếu có giá trị hợp lệ
+        if (typeof location.latitude === 'number' && !isNaN(location.latitude)) {
+          latitude = location.latitude;
+          console.log("DEBUG - Using numeric latitude:", latitude);
+        } else if (typeof location.latitude === 'string' && !isNaN(parseFloat(location.latitude))) {
+          latitude = parseFloat(location.latitude);
+          console.log("DEBUG - Parsed latitude from string:", latitude);
+        }
+        
+        if (typeof location.longitude === 'number' && !isNaN(location.longitude)) {
+          longitude = location.longitude;
+          console.log("DEBUG - Using numeric longitude:", longitude);
+        } else if (typeof location.longitude === 'string' && !isNaN(parseFloat(location.longitude))) {
+          longitude = parseFloat(location.longitude);
+          console.log("DEBUG - Parsed longitude from string:", longitude);
+        }
+        
+        // Kiểm tra và log tọa độ cuối cùng được gán
+        console.log("DEBUG - After parsing, coordinates:", { latitude, longitude });
+        
+        // Nếu không có tọa độ, thực hiện geocoding tự động
+        if (latitude === null || longitude === null) {
+          console.log("DEBUG - Missing coordinates, attempting to geocode address");
+          
+          // Tạo địa chỉ đầy đủ cho geocoding
+          const fullAddress = [
+            location.address,
+            location.ward_name || location.ward,
+            location.district_name || location.district,
+            location.city_name || location.city
+          ].filter(Boolean).join(', ');
+          
+          console.log("DEBUG - Geocoding full address:", fullAddress);
+          
+          try {
+            // Thực hiện geocoding
+            const geocodeResult = await getCoordinatesFromAddress(fullAddress);
+            
+            if (geocodeResult.success) {
+              latitude = geocodeResult.latitude;
+              longitude = geocodeResult.longitude;
+              console.log("DEBUG - Geocoding successful:", { latitude, longitude });
+            } else {
+              console.warn("DEBUG - Geocoding failed:", geocodeResult.message);
+              // Nếu geocode thất bại, trả về lỗi để tránh lưu null vào DB
+              return res.status(400).json({
+                success: false,
+                message: "Không thể xác định tọa độ của địa chỉ. Vui lòng chọn vị trí trên bản đồ."
+              });
+            }
+          } catch (geocodeError) {
+            console.error("DEBUG - Geocoding error:", geocodeError);
+            // Trả về lỗi thay vì tiếp tục với giá trị NULL
+            return res.status(400).json({
+              success: false,
+              message: "Lỗi khi xác định tọa độ. Vui lòng chọn vị trí chính xác trên bản đồ."
+            });
+          }
+        }
+        
+        // Cuối cùng, kiểm tra lại một lần nữa trước khi chèn vào database
+        if (latitude === null || longitude === null) {
+          console.error("DEBUG - Coordinates still null after all attempts. Cannot proceed.");
+          return res.status(400).json({
+            success: false,
+            message: "Tọa độ không thể để trống. Vui lòng chọn vị trí trên bản đồ."
+          });
+        }
+                       
+        console.log("DEBUG - Final latitude value:", latitude);
+        console.log("DEBUG - Final longitude value:", longitude);
+        
         // Kiểm tra xem địa chỉ đã tồn tại chưa
         request.input('address', sql.NVarChar, location.address);
       
@@ -671,7 +905,7 @@ async function updateProperty(req, res) {
             WHERE id = ${id}
           `;
         } else {
-          // Update existing location
+          // Update existing location with new coordinates
           await request.query`
             UPDATE Locations
             SET address = ${location.address},
@@ -679,8 +913,8 @@ async function updateProperty(req, res) {
                 district = ${location.district},
                 ward = ${location.ward},
                 street = ${location.street},
-                latitude = ${location.latitude || 21.0285},
-                longitude = ${location.longitude || 105.8542}
+                latitude = ${latitude}, 
+                longitude = ${longitude}
             WHERE id = (SELECT location_id FROM Properties WHERE id = ${id})
           `;
         }
@@ -871,16 +1105,65 @@ async function deleteProperty(req, res) {
   }
 }
 
-// Advanced search properties
+// Hàm tuỳ chỉnh để xử lý đầu vào tham số URL
+function getCleanParam(req, paramName) {
+  const value = req.query[paramName];
+  
+  // Log giá trị gốc
+  console.log(`Giá trị gốc của tham số ${paramName}:`, {
+    value,
+    type: typeof value,
+    length: value ? value.length : 0
+  });
+  
+  // Nếu không có giá trị, trả về null
+  if (!value) return null;
+  
+  // Làm sạch giá trị
+  let cleanValue = value.toString().trim();
+  
+  // Nếu là 'land', 'apartment', 'house', 'villa' thì standardize
+  if (['land', 'apartment', 'house', 'villa'].includes(cleanValue)) {
+    // Đảm bảo giá trị là chuẩn và không có khoảng trắng
+    cleanValue = cleanValue.toLowerCase().trim();
+  }
+  
+  // Log giá trị đã làm sạch
+  console.log(`Giá trị đã làm sạch của tham số ${paramName}:`, cleanValue);
+  
+  return cleanValue;
+}
+
+// Tìm kiếm bất động sản
 async function searchProperties(req, res) {
   try {
-    console.log('Search query params:', req.query);
+    console.log('\n=========== BẮT ĐẦU TÌM KIẾM BẤT ĐỘNG SẢN ===========');
+    console.log('URL đầy đủ:', req.originalUrl);
+    console.log('Các tham số tìm kiếm (raw):', req.query);
     
+    // DEBUG: Log toàn bộ các tham số tìm kiếm với kiểu dữ liệu
+    const paramTypes = {};
+    for (const key in req.query) {
+      paramTypes[key] = {
+        value: req.query[key],
+        type: typeof req.query[key],
+        isEmpty: req.query[key] === '',
+        isNull: req.query[key] === null,
+        isUndefined: req.query[key] === undefined
+      };
+    }
+    console.log('Chi tiết các tham số tìm kiếm với kiểu dữ liệu:', paramTypes);
+    
+    // Xử lý các tham số quan trọng bằng hàm getCleanParam
+    const cleanPropertyType = getCleanParam(req, 'property_type');
+    const cleanCity = getCleanParam(req, 'city');
+    const cleanCityName = getCleanParam(req, 'city_name');
+    const cleanDistrict = getCleanParam(req, 'district');
+    const cleanListingType = getCleanParam(req, 'listing_type');
+    
+    // Các tham số khác từ URL
     const {
       // Location filters
-      city,
-      city_name,
-      district,
       ward,
       
       // Price range
@@ -894,13 +1177,11 @@ async function searchProperties(req, res) {
       // Property details
       bedrooms,
       bathrooms,
-      property_type,
       amenities,
       
       // Additional filters
       status,
       parking_slots,
-      listing_type,
       
       // Search text
       keyword,
@@ -913,6 +1194,37 @@ async function searchProperties(req, res) {
       page = 1,
       limit = 10
     } = req.query;
+
+    // ===== KIỂM TRA BẤT THƯỜNG =====
+    if (cleanPropertyType) {
+      console.log('DEBUG PROPERTY TYPE:', {
+        value: cleanPropertyType,
+        type: typeof cleanPropertyType,
+        trimmed: cleanPropertyType.trim(),
+        length: cleanPropertyType.length,
+        charCodes: Array.from(cleanPropertyType).map(char => char.charCodeAt(0))
+      });
+      
+      // Kiểm tra nếu cleanPropertyType === 'land'
+      console.log('cleanPropertyType === "land":', cleanPropertyType === 'land');
+      console.log('cleanPropertyType.trim() === "land":', cleanPropertyType.trim() === 'land');
+    }
+    
+    if (cleanCity) {
+      console.log('DEBUG CITY:', {
+        value: cleanCity,
+        type: typeof cleanCity
+      });
+    }
+    
+    if (cleanCityName) {
+      console.log('DEBUG CITY_NAME:', {
+        value: cleanCityName,
+        type: typeof cleanCityName,
+        normalizedValue: cleanCityName.normalize('NFC')
+      });
+    }
+    // ===================================
 
     // Create request object
     const request = new sql.Request();
@@ -927,10 +1239,10 @@ async function searchProperties(req, res) {
     let orderByClause = '';
 
     // Listing type filter (sale or rent)
-    if (listing_type) {
+    if (cleanListingType) {
       whereClause += ' AND p.listing_type = @listing_type';
-      request.input('listing_type', sql.NVarChar, listing_type);
-      console.log('Filtering by listing_type:', listing_type);
+      request.input('listing_type', sql.NVarChar, cleanListingType);
+      console.log('Lọc theo loại giao dịch:', cleanListingType);
     }
 
     // Keyword search in title and description
@@ -942,91 +1254,155 @@ async function searchProperties(req, res) {
         OR l.street LIKE @keyword
       )`;
       request.input('keyword', sql.NVarChar, `%${keyword}%`);
-      console.log('Filtering by keyword:', keyword);
+      console.log('Lọc theo từ khóa:', keyword);
     }
 
-    // Location filters
-    if (city_name) {
-      // If city_name is provided, use it (it contains the actual name like "Hồ Chí Minh")
-      whereClause += ' AND l.city = @city_name';
-      request.input('city_name', sql.NVarChar, city_name);
-      console.log('Filtering by city_name:', city_name);
-    } else if (city) {
-      // Fall back to city parameter if city_name is not provided
+    // City filtering - cải thiện xử lý city và city_name
+    // Xử lý city_name và city - QUAN TRỌNG: Sử dụng city_id nếu có cả hai
+    let usedCityFilter = false;
+    
+    // Ưu tiên xử lý city_name trước và chuyển thành city ID cho các thành phố lớn
+    if (cleanCityName) {
+      const normalizedCityName = cleanCityName.normalize('NFC'); // Chuẩn hóa Unicode cho tiếng Việt
+      console.log('Lọc theo city_name (đã chuẩn hóa):', normalizedCityName);
+      
+      // DEBUG - In toàn bộ giá trị city_name trong database để kiểm tra
+      await displayUniqueCityNames(request);
+      
+      // Chuyển đổi city_name thành city ID cho các thành phố lớn
+      const lowerCityName = normalizedCityName.toLowerCase();
+      
+      if (lowerCityName.includes('hà nội') || lowerCityName.includes('ha noi')) {
+        // Tìm kiếm Hà Nội bằng mã thành phố
+        whereClause += " AND l.city = '1'";
+        console.log('Chuyển đổi "Hà Nội" thành mã thành phố 1');
+        usedCityFilter = true;
+      } 
+      else if (lowerCityName.includes('hồ chí minh') || lowerCityName.includes('ho chi minh') || lowerCityName.includes('saigon') || lowerCityName.includes('sài gòn')) {
+        // Tìm kiếm Hồ Chí Minh bằng mã thành phố
+        whereClause += " AND l.city = '79'";
+        console.log('Chuyển đổi "Hồ Chí Minh" thành mã thành phố 79');
+        usedCityFilter = true;
+      }
+      else {
+        // Tìm kiếm chính xác theo tên thành phố
+        whereClause += " AND l.city_name = @city_name_exact";
+        request.input('city_name_exact', sql.NVarChar, normalizedCityName);
+        console.log('Lọc chính xác theo tên thành phố:', normalizedCityName);
+        usedCityFilter = true;
+      }
+    }
+    // Chỉ xử lý city nếu chưa xử lý city_name
+    else if (cleanCity && !usedCityFilter) {
+      if (cleanCity === '1' || cleanCity === '01') {
+        whereClause += " AND l.city = '1'";
+        console.log('Lọc theo mã thành phố Hà Nội (ID: 1)');
+      } else if (cleanCity === '79') {
+        whereClause += " AND l.city = '79'";
+        console.log('Lọc theo mã thành phố Hồ Chí Minh (ID: 79)');
+      } else {
       whereClause += ' AND l.city = @city';
-      request.input('city', sql.NVarChar, city);
-      console.log('Filtering by city:', city);
+        request.input('city', sql.NVarChar, cleanCity);
+        console.log('Lọc theo mã thành phố:', cleanCity);
+    }
+      usedCityFilter = true;
     }
     
-    if (district) {
+    // District filter - chỉ áp dụng nếu đã có city filter
+    if (cleanDistrict && usedCityFilter) {
       whereClause += ' AND l.district = @district';
-      request.input('district', sql.NVarChar, district);
-      console.log('Filtering by district:', district);
+      request.input('district', sql.NVarChar, cleanDistrict);
+      console.log('Lọc theo quận/huyện:', cleanDistrict);
+    } else if (cleanDistrict) {
+      // Nếu chỉ có district mà không có city, vẫn tìm theo district
+      whereClause += ' AND l.district = @district';
+      request.input('district', sql.NVarChar, cleanDistrict);
+      console.log('Lọc theo quận/huyện (không có thành phố):', cleanDistrict);
     }
     
+    // Ward filter
     if (ward) {
       whereClause += ' AND l.ward = @ward';
       request.input('ward', sql.NVarChar, ward);
-      console.log('Filtering by ward:', ward);
+      console.log('Lọc theo phường/xã:', ward);
     }
 
     // Price range
     if (price_min) {
       whereClause += ' AND p.price >= @price_min';
       request.input('price_min', sql.Decimal(18,2), parseFloat(price_min));
-      console.log('Filtering by price_min:', price_min);
+      console.log('Lọc theo giá tối thiểu:', price_min);
     }
     
     if (price_max) {
       whereClause += ' AND p.price <= @price_max';
       request.input('price_max', sql.Decimal(18,2), parseFloat(price_max));
-      console.log('Filtering by price_max:', price_max);
+      console.log('Lọc theo giá tối đa:', price_max);
     }
 
     // Area range
     if (area_min) {
       whereClause += ' AND p.area >= @area_min';
       request.input('area_min', sql.Float, parseFloat(area_min));
-      console.log('Filtering by area_min:', area_min);
+      console.log('Lọc theo diện tích tối thiểu:', area_min);
     }
     
     if (area_max) {
       whereClause += ' AND p.area <= @area_max';
       request.input('area_max', sql.Float, parseFloat(area_max));
-      console.log('Filtering by area_max:', area_max);
+      console.log('Lọc theo diện tích tối đa:', area_max);
     }
 
     // Property details
+    if (cleanPropertyType) {
+      console.log('Lọc theo loại bất động sản (đã làm sạch):', cleanPropertyType);
+      
+      // So sánh chính xác từng loại để đảm bảo không có lỗi encoding
+      let propertyTypeClause = '';
+      if (cleanPropertyType === 'land') {
+        propertyTypeClause = "p.property_type = 'land'";
+      } else if (cleanPropertyType === 'apartment') {
+        propertyTypeClause = "p.property_type = 'apartment'";
+      } else if (cleanPropertyType === 'house') {
+        propertyTypeClause = "p.property_type = 'house'";
+      } else if (cleanPropertyType === 'villa') {
+        propertyTypeClause = "p.property_type = 'villa'";
+      } else {
+        // Nếu không phải các giá trị chuẩn, dùng tham số
+        propertyTypeClause = "p.property_type = @property_type";
+        request.input('property_type', sql.NVarChar, cleanPropertyType);
+      }
+      
+      whereClause += ` AND ${propertyTypeClause}`;
+    }
+    
     if (bedrooms) {
       whereClause += ' AND p.bedrooms >= @bedrooms';
       request.input('bedrooms', sql.Int, parseInt(bedrooms));
-      console.log('Filtering by bedrooms:', bedrooms);
+      console.log('Lọc theo số phòng ngủ:', bedrooms);
     }
     
     if (bathrooms) {
       whereClause += ' AND p.bathrooms >= @bathrooms';
       request.input('bathrooms', sql.Int, parseInt(bathrooms));
-      console.log('Filtering by bathrooms:', bathrooms);
-    }
-    
-    if (property_type) {
-      whereClause += ' AND p.property_type = @property_type';
-      request.input('property_type', sql.NVarChar, property_type);
-      console.log('Filtering by property_type:', property_type);
+      console.log('Lọc theo số phòng tắm:', bathrooms);
     }
     
     if (parking_slots) {
       whereClause += ' AND p.parking_slots >= @parking_slots';
       request.input('parking_slots', sql.Int, parseInt(parking_slots));
+      console.log('Lọc theo số chỗ đậu xe:', parking_slots);
     }
     
     if (status) {
       whereClause += ' AND p.status = @status';
       request.input('status', sql.NVarChar, status);
+      console.log('Lọc theo trạng thái:', status);
     } else {
       // Mặc định chỉ hiện bất động sản còn available
       whereClause += ' AND p.status = @default_status';
       request.input('default_status', sql.NVarChar, 'available');
+      console.log('Lọc mặc định: chỉ BĐS có trạng thái available');
     }
 
     // Amenities filter (multiple values possible)
@@ -1039,6 +1415,7 @@ async function searchProperties(req, res) {
         request.input(`amenity${index}`, sql.NVarChar, `%${amenity.trim()}%`);
       });
       whereClause += ')';
+      console.log('Lọc theo tiện ích:', amenities);
     }
 
     // Sorting
@@ -1049,8 +1426,9 @@ async function searchProperties(req, res) {
     const sortDir = validSortDirections.includes(sort_direction.toUpperCase()) ? sort_direction.toUpperCase() : 'DESC';
     
     orderByClause = ` ORDER BY p.${sortColumn} ${sortDir}`;
+    console.log('Sắp xếp theo:', sortColumn, sortDir);
 
-    console.log('Where clause:', whereClause);
+    console.log('Câu lệnh WHERE cuối cùng:', whereClause);
 
     // Get total count for pagination
     const countQuery = `
@@ -1061,11 +1439,13 @@ async function searchProperties(req, res) {
       ${whereClause}
     `;
     
+    console.log('Thực thi truy vấn đếm...');
     const countResult = await request.query(countQuery);
     const total = countResult.recordset[0].total;
     const totalPages = Math.ceil(total / parseInt(limit));
+    console.log(`Tổng số kết quả: ${total}, Tổng số trang: ${totalPages}`);
 
-    // Main search query
+    // Main search query - updated to not select non-existent columns
     const query = `
       SELECT 
         p.*,
@@ -1085,9 +1465,24 @@ async function searchProperties(req, res) {
       FETCH NEXT @limit ROWS ONLY
     `;
 
-    console.log('Executing search query...');
+    console.log('Thực thi truy vấn tìm kiếm...');
     const result = await request.query(query);
-    console.log(`Found ${result.recordset.length} properties`);
+    console.log(`Đã tìm thấy ${result.recordset.length} bất động sản`);
+    
+    // Kiểm tra các thuộc tính của bất động sản đầu tiên đã tìm được (nếu có)
+    if (result.recordset.length > 0) {
+      const firstProperty = result.recordset[0];
+      console.log('Thông tin chi tiết bất động sản đầu tiên:', {
+        id: firstProperty.id,
+        title: firstProperty.title,
+        property_type: firstProperty.property_type,
+        city: firstProperty.city,
+        city_name: firstProperty.city_name,
+        district: firstProperty.district
+      });
+    }
+    
+    console.log('=========== KẾT THÚC TÌM KIẾM ===========\n');
 
     // Format the response
     res.json({
@@ -1105,11 +1500,32 @@ async function searchProperties(req, res) {
             console.error('Error parsing images JSON:', error);
           }
           
+          // Map city codes to names for frontend display
+          let cityName = property.city || '';
+          if (property.city === '1' || property.city === '01') {
+            cityName = 'Hà Nội';
+          } else if (property.city === '79') {
+            cityName = 'Hồ Chí Minh';
+          }
+          
           return {
             ...property,
             images: imageArray,
             average_rating: 0, // Temporary until Reviews table is added
-            favorite_count: property.favorite_count || 0
+            favorite_count: property.favorite_count || 0,
+            // Create location object with available fields
+            location: {
+              city: property.city || '',
+              city_name: cityName, // Provide city_name based on city code
+              district: property.district || '',
+              district_name: property.district || '', // Use district as district_name
+              ward: property.ward || '',
+              ward_name: property.ward || '', // Use ward as ward_name
+              address: property.address || '',
+              street: property.street || '',
+              latitude: property.latitude,
+              longitude: property.longitude
+            }
           };
         }),
         pagination: {
@@ -1127,6 +1543,18 @@ async function searchProperties(req, res) {
       message: 'Lỗi server',
       error: error.message
     });
+  }
+}
+
+// Hàm trợ giúp debug: Hiển thị tất cả các giá trị city_name duy nhất trong cơ sở dữ liệu
+async function displayUniqueCityNames(request) {
+  try {
+    const query = "SELECT DISTINCT city, city_name FROM Locations WHERE city_name IS NOT NULL";
+    const result = await request.query(query);
+    console.log("Danh sách thành phố trong cơ sở dữ liệu:");
+    console.table(result.recordset);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách thành phố:", error);
   }
 }
 
@@ -1161,12 +1589,6 @@ const getPropertyById = async (req, res) => {
     try {
       if (property.images) {
         imageUrls = JSON.parse(property.images);
-        console.log('Parsed images from JSON field, found:', imageUrls.length);
-        if (imageUrls.length > 0) {
-          console.log('First image URL:', imageUrls[0].substring(0, 50) + '...');
-        }
-      } else {
-        console.log('No images JSON field found');
       }
     } catch (error) {
       console.error('Error parsing images JSON:', error);
@@ -1183,11 +1605,33 @@ const getPropertyById = async (req, res) => {
       }
     }
 
+    // Log coordinates for debugging
+    console.log('DEBUG - Location coordinates from database:', {
+      latitude: property.latitude,
+      longitude: property.longitude
+    });
+
+    // Create a structured response that explicitly includes the location object
     const responseData = {
       success: true,
       message: 'Lấy chi tiết bất động sản thành công',
       data: {
-        property,
+        property: {
+          ...property,
+          // Add a structured location object that includes coordinates
+          location: {
+            address: property.address,
+            city: property.city,
+            city_name: property.city_name,
+            district: property.district,
+            district_name: property.district_name,
+            ward: property.ward,
+            ward_name: property.ward_name,
+            street: property.street,
+            latitude: property.latitude,
+            longitude: property.longitude
+          }
+        },
         images: imageUrls
       }
     };
@@ -1398,6 +1842,144 @@ async function getFavoriteProperties(req, res) {
   }
 }
 
+// Report a property
+const reportProperty = async (req, res) => {
+  try {
+    const propertyId = req.params.id;
+    const userId = req.user.id;
+    const { reason, details } = req.body;
+    
+    // Validate input
+    if (!reason || !details) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp lý do và mô tả chi tiết'
+      });
+    }
+    
+    // Check if property exists
+    const propertyCheck = await sql.query`
+      SELECT id FROM Properties WHERE id = ${propertyId}
+    `;
+    
+    if (propertyCheck.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bất động sản'
+      });
+    }
+    
+    // Check if user has already reported this property
+    const existingReport = await sql.query`
+      SELECT id FROM PropertyReports 
+      WHERE property_id = ${propertyId} AND user_id = ${userId}
+    `;
+    
+    if (existingReport.recordset.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bạn đã báo cáo tin đăng này trước đó'
+      });
+    }
+    
+    // Insert new report
+    await sql.query`
+      INSERT INTO PropertyReports (property_id, user_id, reason, details, status, created_at)
+      VALUES (${propertyId}, ${userId}, ${reason}, ${req.body.details}, 'pending', GETDATE())
+    `;
+    
+    // Notify admin (optional)
+    // TODO: Add notification logic here
+    
+    res.status(201).json({
+      success: true,
+      message: 'Báo cáo đã được gửi thành công'
+    });
+  } catch (error) {
+    console.error('Error reporting property:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server',
+      error: error.message
+    });
+  }
+};
+
+// Gia hạn tin đăng đã hết hạn
+async function renewProperty(req, res) {
+  try {
+    // Lấy property ID từ URL parameter
+    const propertyId = req.params.id;
+    
+    // Lấy user ID từ token
+    const userId = req.user.id;
+    
+    // Kiểm tra property tồn tại và thuộc về user hiện tại
+    const checkQuery = `
+      SELECT * FROM Properties
+      WHERE id = @propertyId AND owner_id = @userId
+    `;
+    
+    const request = new sql.Request();
+    request.input('propertyId', sql.Int, propertyId);
+    request.input('userId', sql.Int, userId);
+    
+    const propertyResult = await request.query(checkQuery);
+    
+    if (propertyResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy tin đăng hoặc bạn không có quyền gia hạn tin này'
+      });
+    }
+    
+    const property = propertyResult.recordset[0];
+    
+    // Tính toán ngày hết hạn mới (thêm 10 ngày từ ngày hiện tại)
+    const newExpirationDate = new Date();
+    newExpirationDate.setDate(newExpirationDate.getDate() + 10);
+    
+    // Cập nhật trạng thái tin đăng và ngày hết hạn
+    const updateQuery = `
+      UPDATE Properties
+      SET
+        status = 'available',
+        expires_at = @newExpirationDate,
+        updated_at = GETDATE()
+      WHERE id = @propertyId
+    `;
+    
+    request.input('newExpirationDate', sql.DateTime, newExpirationDate);
+    
+    const updateResult = await request.query(updateQuery);
+    
+    if (updateResult.rowsAffected[0] === 0) {
+      return res.status(500).json({
+        success: false,
+        message: 'Không thể gia hạn tin đăng'
+      });
+    }
+    
+    // Trả về thông tin cập nhật thành công
+    res.json({
+      success: true,
+      message: 'Gia hạn tin đăng thành công',
+      data: {
+        property_id: propertyId,
+        new_expiration_date: newExpirationDate,
+        status: 'available'
+      }
+    });
+  } catch (error) {
+    console.error('Lỗi khi gia hạn tin đăng:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server',
+      error: error.message
+    });
+  }
+}
+
 // Export all controllers
 module.exports = {
   authenticateToken,
@@ -1410,5 +1992,7 @@ module.exports = {
   addToFavorites,
   removeFromFavorites,
   getFavoriteProperties,
-  createProperty
+  createProperty,
+  reportProperty,
+  renewProperty
 };

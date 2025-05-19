@@ -1,4 +1,5 @@
 const notificationModel = require('../models/notificationModel');
+const userModel = require('../models/userModel');
 
 // Lấy danh sách thông báo của người dùng đã đăng nhập
 const getUserNotifications = async (req, res) => {
@@ -164,9 +165,8 @@ const updateNotificationSettings = async (req, res) => {
             email_notifications,
             push_notifications,
             sms_notifications,
-            marketing_notifications,
-            property_updates,
-            messages,
+            property_expiration_notifications,
+            admin_notifications,
             system_notifications
         } = req.body;
         
@@ -175,9 +175,8 @@ const updateNotificationSettings = async (req, res) => {
             email_notifications: Boolean(email_notifications),
             push_notifications: Boolean(push_notifications),
             sms_notifications: Boolean(sms_notifications),
-            marketing_notifications: Boolean(marketing_notifications),
-            property_updates: Boolean(property_updates),
-            messages: Boolean(messages),
+            property_expiration_notifications: Boolean(property_expiration_notifications),
+            admin_notifications: Boolean(admin_notifications),
             system_notifications: Boolean(system_notifications)
         };
         
@@ -209,6 +208,87 @@ const createNotification = async (notificationData) => {
     }
 };
 
+// Tạo thông báo khi tin đăng hết hạn
+const createPropertyExpirationNotification = async (property) => {
+    try {
+        // Kiểm tra xem người dùng có bật thông báo về tin đăng hết hạn không
+        const userSettings = await notificationModel.getNotificationSettings(property.owner_id);
+        
+        if (userSettings.property_expiration_notifications) {
+            await notificationModel.createPropertyExpirationNotification(property);
+            console.log(`Created expiration notification for property ${property.id}`);
+        }
+    } catch (error) {
+        console.error('Error creating property expiration notification:', error);
+    }
+};
+
+// Gửi thông báo từ admin đến người dùng theo tiêu chí
+const sendAdminNotificationToUsers = async (adminNotificationId) => {
+    try {
+        const { sql } = require('../config/database');
+        const request = new sql.Request();
+        
+        // Lấy thông tin admin notification
+        request.input('id', sql.Int, adminNotificationId);
+        const result = await request.query(`
+            SELECT * FROM AdminNotifications WHERE id = @id
+        `);
+        
+        if (result.recordset.length === 0) {
+            console.error(`Admin notification with ID ${adminNotificationId} not found`);
+            return false;
+        }
+        
+        const adminNotification = result.recordset[0];
+        
+        // Lấy danh sách user dựa trên target_type
+        let userIds = [];
+        
+        if (adminNotification.target_type === 'all_users') {
+            // Lấy tất cả người dùng
+            const usersResult = await request.query(`
+                SELECT id FROM Users WHERE is_active = 1
+            `);
+            userIds = usersResult.recordset.map(user => user.id);
+        } 
+        else if (adminNotification.target_type === 'property_owners') {
+            // Lấy các chủ sở hữu bất động sản
+            const ownersResult = await request.query(`
+                SELECT DISTINCT owner_id as id FROM Properties
+            `);
+            userIds = ownersResult.recordset.map(owner => owner.id);
+        }
+        else if (adminNotification.target_type === 'specific_users' && adminNotification.target_users) {
+            // Parse JSON array từ target_users
+            try {
+                userIds = JSON.parse(adminNotification.target_users);
+            } catch (e) {
+                console.error('Error parsing target_users JSON:', e);
+                return false;
+            }
+        }
+        
+        // Tạo thông báo cho từng người dùng
+        let successCount = 0;
+        for (const userId of userIds) {
+            // Kiểm tra settings của người dùng
+            const userSettings = await notificationModel.getNotificationSettings(userId);
+            
+            if (userSettings.admin_notifications) {
+                await notificationModel.createAdminNotification(userId, adminNotification);
+                successCount++;
+            }
+        }
+        
+        console.log(`Sent admin notification to ${successCount} users`);
+        return successCount;
+    } catch (error) {
+        console.error('Error sending admin notification to users:', error);
+        return false;
+    }
+};
+
 module.exports = {
     getUserNotifications,
     getUnreadCount,
@@ -217,5 +297,7 @@ module.exports = {
     deleteNotification,
     getNotificationSettings,
     updateNotificationSettings,
-    createNotification
+    createNotification,
+    createPropertyExpirationNotification,
+    sendAdminNotificationToUsers
 }; 

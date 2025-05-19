@@ -67,8 +67,17 @@ const HomePage: React.FC = () => {
       {/* Hero Section */}
       <HeroSection />
       
-      {/* SearchHeader được thêm vào ngay sau HeroSection */}
-      <SearchHeader />
+      {/* SearchHeader positioned below the HeroSection */}
+      <Box sx={{ 
+        bgcolor: '#f5f8fa', 
+        py: 4,
+        position: 'relative',
+        borderBottom: '1px solid #e0e6ed'
+      }}>
+        <Container maxWidth="lg">
+          <SearchHeader variant="simple" transactionType="sale" />
+        </Container>
+      </Box>
       
       {/* Statistics Section */}
       <Box sx={{ py: 6, bgcolor: 'white' }}>
@@ -236,10 +245,10 @@ const HomePage: React.FC = () => {
         </Container>
       </Box>
       
-      {/* Popular Provinces Section - Using ProvinceList component */}
+      {/* Popular Cities Selection */}
       <Box sx={{ py: 8, bgcolor: 'background.default' }}>
         <Container maxWidth="lg">
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Box sx={{ textAlign: 'center', mb: 6 }}>
             <Typography 
               variant="h4" 
               component="h2" 
@@ -261,24 +270,12 @@ const HomePage: React.FC = () => {
                 }
               }}
             >
-              Khám phá bất động sản theo địa điểm
-            </Typography>
-            
-            <Typography 
-              variant="subtitle1" 
-              color="text.secondary"
-              sx={{ 
-                mt: 3,
-                maxWidth: 700,
-                mx: 'auto'
-              }}
-            >
-              Tìm kiếm bất động sản ở các tỉnh thành trên khắp Việt Nam
+              Khám phá bất động sản theo thành phố
             </Typography>
           </Box>
+          
+          <ProvinceList />
         </Container>
-        
-        <ProvinceList />
       </Box>
       
       {/* Call to Action Section */}
