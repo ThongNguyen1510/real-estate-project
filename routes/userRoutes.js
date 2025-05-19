@@ -106,6 +106,10 @@ router.get("/favorites", auth, userController.getUserFavorites);
 router.post("/properties/favorites/:propertyId", auth, userController.addToFavorites);
 router.delete("/properties/favorites/:propertyId", auth, userController.removeFromFavorites);
 
+// Thêm routes mới để lấy số lượng tin đăng và yêu thích
+router.get("/property-count", auth, userController.getUserPropertyCount);
+router.get("/favorite-count", auth, userController.getUserFavoriteCount);
+
 // Settings (authentication required)
 router.get("/settings", auth, userController.getUserSettings);
 router.put("/settings", auth, userController.updateUserSettings);

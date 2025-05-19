@@ -4,7 +4,7 @@ import { getAccessToken } from './authUtils';
 const API_URL = '/api';
 
 // Lấy danh sách bất động sản của người dùng
-export const getProperties = async (page = 1, limit = 10) => {
+const getProperties = async (page = 1, limit = 10) => {
   try {
     const response = await axios.get(`${API_URL}/auth/properties`, {
       headers: {
@@ -22,7 +22,7 @@ export const getProperties = async (page = 1, limit = 10) => {
 };
 
 // Xóa một bất động sản
-export const deleteProperty = async (propertyId: number) => {
+const deleteProperty = async (propertyId: number) => {
   try {
     const response = await axios.delete(`${API_URL}/properties/${propertyId}`, {
       headers: {
@@ -39,7 +39,7 @@ export const deleteProperty = async (propertyId: number) => {
 };
 
 // Lấy thông tin chi tiết một bất động sản để chỉnh sửa
-export const getPropertyForEdit = async (propertyId: number) => {
+const getPropertyForEdit = async (propertyId: number) => {
   try {
     const response = await axios.get(`${API_URL}/properties/${propertyId}/edit`, {
       headers: {
@@ -56,7 +56,7 @@ export const getPropertyForEdit = async (propertyId: number) => {
 };
 
 // Cập nhật thông tin bất động sản
-export const updateProperty = async (propertyId: number, data: any) => {
+const updateProperty = async (propertyId: number, data: any) => {
   try {
     const response = await axios.put(`${API_URL}/properties/${propertyId}`, data, {
       headers: {
@@ -73,7 +73,7 @@ export const updateProperty = async (propertyId: number, data: any) => {
 };
 
 // Lấy danh sách các bất động sản yêu thích
-export const getFavorites = async (page?: number, limit?: number) => {
+const getFavorites = async (page?: number, limit?: number) => {
   try {
     const params: Record<string, any> = {};
     if (page) params.page = page;
@@ -95,7 +95,7 @@ export const getFavorites = async (page?: number, limit?: number) => {
 };
 
 // Thêm bất động sản vào yêu thích
-export const addToFavorites = async (propertyId: number) => {
+const addToFavorites = async (propertyId: number) => {
   try {
     const response = await axios.post(`${API_URL}/properties/${propertyId}/favorite`, null, {
       headers: {
@@ -112,7 +112,7 @@ export const addToFavorites = async (propertyId: number) => {
 };
 
 // Xóa bất động sản khỏi danh sách yêu thích
-export const removeFromFavorites = async (propertyId: number) => {
+const removeFromFavorites = async (propertyId: number) => {
   try {
     const response = await axios.delete(`${API_URL}/properties/${propertyId}/favorite`, {
       headers: {
@@ -129,7 +129,7 @@ export const removeFromFavorites = async (propertyId: number) => {
 };
 
 // Lấy thông tin người dùng
-export const getUserProfile = async () => {
+const getUserProfile = async () => {
   try {
     const response = await axios.get(`${API_URL}/auth/profile`, {
       headers: {
@@ -146,7 +146,7 @@ export const getUserProfile = async () => {
 };
 
 // Cập nhật thông tin người dùng
-export const updateProfile = async (data: any) => {
+const updateProfile = async (data: any) => {
   try {
     const response = await axios.put(`${API_URL}/auth/profile`, data, {
       headers: {
@@ -163,7 +163,7 @@ export const updateProfile = async (data: any) => {
 };
 
 // Thay đổi mật khẩu
-export const changePassword = async (data: { current_password: string, new_password: string }) => {
+const changePassword = async (data: { current_password: string, new_password: string }) => {
   try {
     const response = await axios.put(`${API_URL}/auth/password`, data, {
       headers: {
@@ -180,7 +180,7 @@ export const changePassword = async (data: { current_password: string, new_passw
 };
 
 // Lấy thông tin người dùng theo ID
-export const getUserInfo = async (userId: number) => {
+const getUserInfo = async (userId: number) => {
   try {
     const response = await axios.get(`${API_URL}/users/${userId}`, {
       headers: {
@@ -197,7 +197,7 @@ export const getUserInfo = async (userId: number) => {
 };
 
 // Get user profile
-export const getProfile = async () => {
+const getProfile = async () => {
   try {
     const response = await axios.get(`${API_URL}/users/profile`, {
       headers: {
@@ -214,7 +214,7 @@ export const getProfile = async () => {
 };
 
 // Update user avatar
-export const updateAvatar = async (formData: FormData) => {
+const updateAvatar = async (formData: FormData) => {
   try {
     const response = await axios.post(`${API_URL}/users/avatar`, formData, {
       headers: {
@@ -232,9 +232,43 @@ export const updateAvatar = async (formData: FormData) => {
 };
 
 // Get user by ID
-export const getUserById = async (id: number) => {
+const getUserById = async (id: number) => {
   try {
     const response = await axios.get(`${API_URL}/users/${id}`);
+    return response.data;
+  } catch (error: any) {
+    if (error.response) {
+      return error.response.data;
+    }
+    return { success: false, message: error.message };
+  }
+};
+
+// Đếm số lượng tin đăng của người dùng
+const getUserPropertyCount = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/users/property-count`, {
+      headers: {
+        Authorization: `Bearer ${getAccessToken()}`
+      }
+    });
+    return response.data;
+  } catch (error: any) {
+    if (error.response) {
+      return error.response.data;
+    }
+    return { success: false, message: error.message };
+  }
+};
+
+// Đếm số lượng tin yêu thích của người dùng
+const getUserFavoriteCount = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/users/favorite-count`, {
+      headers: {
+        Authorization: `Bearer ${getAccessToken()}`
+      }
+    });
     return response.data;
   } catch (error: any) {
     if (error.response) {
@@ -258,5 +292,7 @@ export default {
   getUserInfo,
   getProfile,
   updateAvatar,
-  getUserById
+  getUserById,
+  getUserPropertyCount,
+  getUserFavoriteCount
 }; 

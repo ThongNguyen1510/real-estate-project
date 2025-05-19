@@ -6,43 +6,44 @@ import {
   Typography,
   Box,
   Paper,
-  InputBase,
-  IconButton,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Slider,
   Button,
   Pagination,
   CircularProgress,
   Alert,
   Divider,
   Chip,
-  TextField,
-  FormGroup,
-  FormControlLabel,
-  Checkbox,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails
+  Stack
 } from '@mui/material';
 import {
-  Search as SearchIcon,
-  LocationOn as LocationIcon,
-  Home as HomeIcon,
-  Hotel as HotelIcon,
-  Bathtub as BathtubIcon,
-  DirectionsCar as CarIcon,
-  ArrowForward as ArrowForwardIcon,
-  Tune as TuneIcon,
-  ExpandMore as ExpandMoreIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  TravelExplore as TravelExploreIcon
 } from '@mui/icons-material';
 import { searchProperties } from '../services/api/propertyService';
 import PropertyCard from '../components/property/PropertyCard';
 import SearchHeader from '../components/search/SearchHeader';
-import LocationSelector from '../components/search/LocationSelector';
+import SearchSidebar from '../components/search/SearchSidebar';
+
+// Danh sách các tỉnh/thành phố với mã số
+const CITIES = [
+  { id: '79', name: 'Hồ Chí Minh' },
+  { id: '1', name: 'Hà Nội' }, // Sử dụng mã đúng '1' thay vì '01'
+  { id: '48', name: 'Đà Nẵng' },
+  { id: '92', name: 'Cần Thơ' },
+  { id: '31', name: 'Hải Phòng' },
+  { id: '56', name: 'Khánh Hòa' },
+  { id: '75', name: 'Bình Dương' },
+  { id: '77', name: 'Đồng Nai' }
+];
+
+// Danh sách loại bất động sản
+const PROPERTY_TYPES = [
+  { value: 'apartment', label: 'Căn hộ chung cư' },
+  { value: 'house', label: 'Nhà riêng' },
+  { value: 'villa', label: 'Biệt thự' },
+  { value: 'land', label: 'Đất nền' },
+  { value: 'office', label: 'Văn phòng' },
+  { value: 'shop', label: 'Mặt bằng kinh doanh' }
+];
 
 // Format tiền VND
 const formatCurrency = (value: number) => {
@@ -58,9 +59,6 @@ const formatArea = (value: number) => {
   return `${value} m²`;
 };
 
-// Danh sách thành phố
-const cities = ['Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Nha Trang', 'Cần Thơ', 'Hải Phòng'];
-
 // Danh sách quận/huyện của Hồ Chí Minh
 const hcmDistricts = [
   'Quận 1', 'Quận 2', 'Quận 3', 'Quận 4', 'Quận 5', 'Quận 6', 'Quận 7', 'Quận 8', 'Quận 9',
@@ -75,16 +73,7 @@ const hanoiDistricts = [
   'Quận Bắc Từ Liêm', 'Quận Hà Đông'
 ];
 
-// Loại bất động sản
-const propertyTypes = [
-  { value: 'apartment', label: 'Căn hộ chung cư' },
-  { value: 'house', label: 'Nhà riêng' },
-  { value: 'villa', label: 'Biệt thự' },
-  { value: 'land', label: 'Đất nền' },
-  { value: 'office', label: 'Văn phòng' },
-  { value: 'shop', label: 'Mặt bằng kinh doanh' }
-];
-
+// Interface for search parameters
 interface SearchParams {
   keyword?: string;
   city?: string;
@@ -110,280 +99,242 @@ interface SearchParams {
 const SearchPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const queryParams = new URLSearchParams(location.search);
   
-  // Trạng thái cho kết quả tìm kiếm
+  // State for search results
   const [properties, setProperties] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Trạng thái cho phân trang
-  const [page, setPage] = useState<number>(parseInt(queryParams.get('page') || '1'));
+  // State for pagination
+  const [page, setPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
-  const limit = 12; // Số bất động sản trên mỗi trang
+  const limit = 12; // Number of properties per page
   
-  // Trạng thái các bộ lọc
+  // Initialize empty search parameters state
   const [searchParams, setSearchParams] = useState<SearchParams>({
-    keyword: queryParams.get('keyword') || '',
-    city: queryParams.get('city') || '',
-    city_name: queryParams.get('city_name') || '',
-    district: queryParams.get('district') || '',
-    ward: queryParams.get('ward') || '',
-    price_min: queryParams.get('price_min') ? Number(queryParams.get('price_min')) : undefined,
-    price_max: queryParams.get('price_max') ? Number(queryParams.get('price_max')) : undefined,
-    area_min: queryParams.get('area_min') ? Number(queryParams.get('area_min')) : undefined,
-    area_max: queryParams.get('area_max') ? Number(queryParams.get('area_max')) : undefined,
-    bedrooms: queryParams.get('bedrooms') || '',
-    bathrooms: queryParams.get('bathrooms') || '',
-    property_type: queryParams.get('property_type') || '',
-    amenities: queryParams.get('amenities') || '',
-    listing_type: queryParams.get('listing_type') || 'sale',
-    status: queryParams.get('status') || 'available',
-    sort_by: queryParams.get('sort_by') || 'created_at',
-    sort_direction: queryParams.get('sort_direction') || 'DESC',
-    page: page,
-    limit: limit
+    keyword: '',
+    city: '',
+    city_name: '',
+    district: '',
+    ward: '',
+    price_min: undefined,
+    price_max: undefined,
+    area_min: undefined,
+    area_max: undefined,
+    bedrooms: '',
+    bathrooms: '',
+    property_type: '',
+    amenities: '',
+    listing_type: 'sale',
+    status: 'available',
+    sort_by: 'created_at',
+    sort_direction: 'DESC',
+    page: 1,
+    limit
   });
   
-  // Trạng thái cho giá trị slider
-  const [priceRange, setPriceRange] = useState<number[]>([
-    searchParams.price_min || 0,
-    searchParams.price_max || 20000000000 // 20 tỷ
-  ]);
-  
-  const [areaRange, setAreaRange] = useState<number[]>([
-    searchParams.area_min || 0,
-    searchParams.area_max || 500
-  ]);
-  
-  // Trạng thái cho hiển thị bộ lọc trên mobile
-  const [showFilters, setShowFilters] = useState<boolean>(false);
-  
-  // Danh sách quận/huyện phụ thuộc vào thành phố
-  const [districts, setDistricts] = useState<string[]>([]);
-  
-  // Cập nhật quận/huyện dựa trên thành phố được chọn
+  // Parse URL when component mounts or URL changes
   useEffect(() => {
-    if (searchParams.city === 'Hồ Chí Minh') {
-      setDistricts(hcmDistricts);
-    } else if (searchParams.city === 'Hà Nội') {
-      setDistricts(hanoiDistricts);
-    } else {
-      setDistricts([]);
+    const queryParams = new URLSearchParams(location.search);
+    const paramsFromUrl: Partial<SearchParams> = {};
+    
+    // Process parameters from URL
+    if (queryParams.has('city')) {
+      const cityId = queryParams.get('city') || '';
+      // Normalize city ID format
+      paramsFromUrl.city = cityId === '01' ? '1' : cityId;
+      
+      // Set city_name based on city id if not provided
+      if (!queryParams.has('city_name')) {
+        if (paramsFromUrl.city === '1') {
+          paramsFromUrl.city_name = 'Hà Nội';
+        } else if (paramsFromUrl.city === '79') {
+          paramsFromUrl.city_name = 'Hồ Chí Minh';
+        }
+      }
     }
-  }, [searchParams.city]);
+    
+    // Get city_name from URL if present
+    if (queryParams.has('city_name')) {
+      paramsFromUrl.city_name = queryParams.get('city_name') || '';
+    }
+    
+    // Get other search parameters
+    if (queryParams.has('district')) {
+      paramsFromUrl.district = queryParams.get('district') || '';
+    }
+    
+    if (queryParams.has('ward')) {
+      paramsFromUrl.ward = queryParams.get('ward') || '';
+    }
+    
+    if (queryParams.has('keyword')) {
+      paramsFromUrl.keyword = queryParams.get('keyword') || '';
+    }
+    
+    if (queryParams.has('property_type')) {
+      paramsFromUrl.property_type = queryParams.get('property_type') || '';
+    }
+    
+    if (queryParams.has('listing_type')) {
+      paramsFromUrl.listing_type = queryParams.get('listing_type') || 'sale';
+    } else {
+      paramsFromUrl.listing_type = 'sale';
+    }
+    
+    if (queryParams.has('price_min')) {
+      paramsFromUrl.price_min = Number(queryParams.get('price_min'));
+    }
+    
+    if (queryParams.has('price_max')) {
+      paramsFromUrl.price_max = Number(queryParams.get('price_max'));
+    }
+    
+    if (queryParams.has('area_min')) {
+      paramsFromUrl.area_min = Number(queryParams.get('area_min'));
+    }
+    
+    if (queryParams.has('area_max')) {
+      paramsFromUrl.area_max = Number(queryParams.get('area_max'));
+    }
+    
+    if (queryParams.has('bedrooms')) {
+      paramsFromUrl.bedrooms = Number(queryParams.get('bedrooms'));
+    }
+    
+    if (queryParams.has('bathrooms')) {
+      paramsFromUrl.bathrooms = Number(queryParams.get('bathrooms'));
+    }
+    
+    if (queryParams.has('sort_by')) {
+      paramsFromUrl.sort_by = queryParams.get('sort_by') || 'created_at';
+    }
+    
+    if (queryParams.has('sort_direction')) {
+      paramsFromUrl.sort_direction = queryParams.get('sort_direction') || 'DESC';
+    }
+    
+    if (queryParams.has('page')) {
+      const pageNum = Number(queryParams.get('page')) || 1;
+      paramsFromUrl.page = pageNum;
+      setPage(pageNum);
+    }
+    
+    // Update search parameters state
+    setSearchParams(prev => ({
+      ...prev,
+      ...paramsFromUrl
+    }));
+    
+    // Perform search if parameters exist in URL
+    if (Object.keys(paramsFromUrl).length > 0) {
+      performSearch(paramsFromUrl);
+    }
+  }, [location.search]);
   
-  // Thực hiện tìm kiếm
-  const performSearch = async () => {
+  // Perform search with given parameters
+  const performSearch = async (params: Partial<SearchParams> = searchParams) => {
     setLoading(true);
     setError(null);
     
     try {
-      console.log('Starting search with params:', searchParams);
+      // Create a copy of parameters for processing
+      const apiParams: Record<string, any> = {};
       
-      // Chuẩn bị tham số tìm kiếm
-      const params: SearchParams = {
-        ...searchParams,
-        page: page,
-        limit: limit
-      };
-      
-      // Đảm bảo các tham số đúng định dạng
+      // Only include parameters with values
       if (params.city) {
-        console.log('City filter:', params.city);
-      }
-      
-      if (params.district) {
-        console.log('District filter:', params.district);
-      }
-      
-      if (params.property_type) {
-        console.log('Property type filter:', params.property_type);
-      }
-      
-      // Xóa các tham số undefined hoặc rỗng
-      Object.keys(params).forEach(key => {
-        const paramKey = key as keyof SearchParams;
-        if (params[paramKey] === undefined || params[paramKey] === '') {
-          delete params[paramKey];
+        // Normalize city ID
+        apiParams.city = params.city === '01' ? '1' : params.city;
+        
+        // Map city code to city_name if city_name is not provided
+        if (params.city_name) {
+          apiParams.city_name = params.city_name;
+        } else {
+          if (apiParams.city === '1') {
+            apiParams.city_name = 'Hà Nội';
+          } else if (apiParams.city === '79') {
+            apiParams.city_name = 'Hồ Chí Minh';
+          }
         }
-      });
-      
-      // Đảm bảo status là 'available' nếu không được chỉ định
-      if (!params.status) {
-        params.status = 'available';
       }
       
-      console.log('Final search params for API call:', params);
-      const response = await searchProperties(params);
+      // Include city_name even without city code if provided
+      if (params.city_name && !params.city) {
+        apiParams.city_name = params.city_name;
+      }
+      
+      // Add other parameters
+      if (params.district) apiParams.district = params.district;
+      if (params.ward) apiParams.ward = params.ward;
+      if (params.keyword) apiParams.keyword = params.keyword;
+      if (params.property_type) apiParams.property_type = params.property_type;
+      if (params.bedrooms) apiParams.bedrooms = params.bedrooms;
+      if (params.bathrooms) apiParams.bathrooms = params.bathrooms;
+      if (params.price_min) apiParams.price_min = params.price_min;
+      if (params.price_max) apiParams.price_max = params.price_max;
+      if (params.area_min) apiParams.area_min = params.area_min;
+      if (params.area_max) apiParams.area_max = params.area_max;
+      if (params.listing_type) apiParams.listing_type = params.listing_type;
+      
+      // Always include available status
+      apiParams.status = 'available';
+      
+      // Add pagination information
+      apiParams.page = params.page || page;
+      apiParams.limit = limit;
+      
+      // Call API with processed parameters
+      const response = await searchProperties(apiParams);
       
       if (response.success) {
-        console.log('Search successful, found:', response.data.properties.length, 'properties');
-        setProperties(response.data.properties);
-        setTotalPages(response.data.pagination.totalPages);
-        setTotalCount(response.data.pagination.total);
+        setProperties(response.data.properties || []);
+        setTotalPages(response.data.pagination?.totalPages || 1);
+        setTotalCount(response.data.pagination?.total || 0);
       } else {
-        console.error('Search API error:', response.message);
-        setError(response.message || 'Có lỗi xảy ra khi tìm kiếm bất động sản');
+        // Instead of showing an error message, simply set properties to empty array
         setProperties([]);
+        setTotalPages(1);
+        setTotalCount(0);
       }
     } catch (err: any) {
-      console.error('Error during search:', err);
-      setError('Có lỗi xảy ra khi tìm kiếm bất động sản');
+      // Instead of setting an error message, just set properties to empty array
       setProperties([]);
+      setTotalPages(1);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
   };
   
-  // Cập nhật URL và thực hiện tìm kiếm khi params thay đổi
-  useEffect(() => {
-    // Cập nhật URL
-    const newSearchParams = new URLSearchParams();
-    
-    Object.entries(searchParams).forEach(([key, value]) => {
-      if (value !== undefined && value !== '' && key !== 'limit') {
-        newSearchParams.set(key, String(value));
-      }
-    });
-    
-    navigate({
-      pathname: '/tim-kiem',
-      search: newSearchParams.toString()
-    }, { replace: true });
-  }, [searchParams]);
-  
-  // Thực hiện tìm kiếm khi URL thay đổi hoặc khi component được mount
-  useEffect(() => {
-    console.log('URL or component changed, performing search');
-    performSearch();
-  }, [location.search]);
-  
-  // Thêm useEffect để đồng bộ searchParams từ URL
-  useEffect(() => {
-    const queryParams = new URLSearchParams(location.search);
-    const paramsFromUrl: Partial<SearchParams> = {};
-    
-    // Lấy tất cả các tham số từ URL
-    queryParams.forEach((value, key) => {
-      switch (key) {
-        case 'page':
-          paramsFromUrl.page = parseInt(value);
-          setPage(parseInt(value));
-          break;
-        case 'price_min':
-        case 'price_max':
-          paramsFromUrl[key] = Number(value);
-          break;
-        case 'area_min':
-        case 'area_max':
-          paramsFromUrl[key] = Number(value);
-          break;
-        case 'keyword':
-        case 'city':
-        case 'city_name':
-        case 'district':
-        case 'ward':
-        case 'property_type':
-        case 'amenities':
-        case 'status':
-        case 'listing_type':
-        case 'sort_by':
-        case 'sort_direction':
-          paramsFromUrl[key] = value;
-          break;
-        case 'bedrooms':
-        case 'bathrooms':
-          paramsFromUrl[key] = value ? Number(value) : undefined;
-          break;
-      }
-    });
-    
-    // Make sure listing_type is set to 'sale' if not specified
-    if (!paramsFromUrl.listing_type) {
-      paramsFromUrl.listing_type = 'sale';
-    }
-    
-    // Cập nhật price range và area range từ URL
-    if (paramsFromUrl.price_min !== undefined || paramsFromUrl.price_max !== undefined) {
-      setPriceRange([
-        paramsFromUrl.price_min || 0,
-        paramsFromUrl.price_max || 20000000000
-      ]);
-    }
-    
-    if (paramsFromUrl.area_min !== undefined || paramsFromUrl.area_max !== undefined) {
-      setAreaRange([
-        paramsFromUrl.area_min || 0,
-        paramsFromUrl.area_max || 500
-      ]);
-    }
-    
-    // Chỉ cập nhật searchParams nếu có thay đổi để tránh vòng lặp vô hạn
-    if (Object.keys(paramsFromUrl).length > 0) {
-      setSearchParams(prev => ({
-        ...prev,
-        ...paramsFromUrl
-      }));
-    }
-  }, [location.search]);
-  
-  // Xử lý thay đổi trang
+  // Handle page change
   const handlePageChange = (_: React.ChangeEvent<unknown>, value: number) => {
     setPage(value);
-    setSearchParams(prev => ({ ...prev, page: value }));
+    
+    // Update URL and perform search
+    const updatedParams = {
+      ...searchParams,
+      page: value
+    };
+    
+    // Update URL
+    const queryParams = new URLSearchParams(location.search);
+    queryParams.set('page', value.toString());
+    navigate(`/tim-kiem?${queryParams.toString()}`);
+    
+    // Perform search
+    performSearch(updatedParams);
+    
+    // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
-  // Xử lý thay đổi bộ lọc (không tự động tìm kiếm)
-  const handleFilterChange = (name: string, value: any) => {
-    console.log(`Filter changed: ${name} = ${value}`);
-    setSearchParams(prev => ({ ...prev, [name]: value }));
-  };
-  
-  // Xử lý thay đổi khoảng giá
-  const handlePriceRangeChange = (_: Event, newValue: number | number[]) => {
-    setPriceRange(newValue as number[]);
-  };
-  
-  // Xử lý thay đổi khoảng diện tích
-  const handleAreaRangeChange = (_: Event, newValue: number | number[]) => {
-    setAreaRange(newValue as number[]);
-  };
-  
-  // Xử lý khi kết thúc thay đổi khoảng giá
-  const handlePriceRangeChangeCommitted = () => {
-    setSearchParams(prev => ({
-      ...prev,
-      price_min: priceRange[0],
-      price_max: priceRange[1]
-    }));
-  };
-  
-  // Xử lý khi kết thúc thay đổi khoảng diện tích
-  const handleAreaRangeChangeCommitted = () => {
-    setSearchParams(prev => ({
-      ...prev,
-      area_min: areaRange[0],
-      area_max: areaRange[1]
-    }));
-  };
-  
-  // Xử lý tìm kiếm khi nhấn Enter
-  const handleSearchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      performSearch();
-    }
-  };
-  
-  // Xử lý tìm kiếm khi nhấn nút tìm kiếm
-  const handleSearchButtonClick = () => {
-    performSearch();
-  };
-  
-  // Reset tất cả bộ lọc
+  // Reset all filters
   const resetFilters = () => {
+    // Navigate to search page with no parameters
+    navigate('/tim-kiem');
+    
+    // Reset search parameters state
     setSearchParams({
       keyword: '',
       city: '',
@@ -398,323 +349,87 @@ const SearchPage: React.FC = () => {
       bathrooms: '',
       property_type: '',
       amenities: '',
-      listing_type: searchParams.listing_type || 'sale',
+      listing_type: 'sale',
       status: 'available',
       sort_by: 'created_at',
       sort_direction: 'DESC',
       page: 1,
-      limit: limit
+      limit
     });
     
-    // Reset slider values
-    setPriceRange([0, 20000000000]);
-    setAreaRange([0, 500]);
-    
-    // Cập nhật URL
-    navigate('/tim-kiem', { replace: true });
-    
-    // Thực hiện tìm kiếm với các bộ lọc đã được reset
-    setPage(1);
-  };
-  
-  // Xử lý áp dụng bộ lọc (khi nhấn nút)
-  const applyFilters = () => {
-    console.log('Applying filters...');
-    // Ensure URL parameters reflect the current search params
-    const newSearchParams = new URLSearchParams();
-    
-    Object.entries(searchParams).forEach(([key, value]) => {
-      if (value !== undefined && value !== '' && key !== 'limit') {
-        newSearchParams.set(key, String(value));
-      }
-    });
-    
-    // Reset to page 1 when applying new filters
-    newSearchParams.set('page', '1');
-    setPage(1);
-    
-    // Update URL and let the location change trigger the search
-    navigate({
-      pathname: '/tim-kiem',
-      search: newSearchParams.toString()
+    // Perform search with default parameters
+    performSearch({
+      listing_type: 'sale',
+      status: 'available',
+      page: 1,
+      limit
     });
   };
   
   return (
     <Box>
-      <SearchHeader />
+      {/* Search Header with detailed search controls */}
+      <SearchHeader
+        variant="detailed"
+        initialValues={searchParams}
+        onSearch={performSearch}
+      />
+      
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        {/* Header */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Kết quả tìm kiếm
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            {loading ? 'Đang tìm kiếm bất động sản phù hợp...' : `Tìm thấy ${totalCount} bất động sản phù hợp`}
-          </Typography>
-        </Box>
-        
         <Grid container spacing={3}>
-          {/* Filters section - Desktop */}
-          <Grid
-            item
-            xs={12}
-            md={3}
-            sx={{
-              display: { xs: showFilters ? 'block' : 'none', md: 'block' },
-              position: { xs: 'fixed', md: 'relative' },
-              top: { xs: 0, md: 'auto' },
-              left: { xs: 0, md: 'auto' },
-              width: { xs: '100%', md: 'auto' },
-              height: { xs: '100vh', md: 'auto' },
-              zIndex: { xs: 1200, md: 1 },
-              bgcolor: 'background.paper',
-              p: { xs: 2, md: 0 },
-              overflowY: { xs: 'auto', md: 'visible' }
-            }}
-          >
-            <Box sx={{ display: { xs: 'flex', md: 'none' }, justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6">Bộ lọc tìm kiếm</Typography>
-              <IconButton onClick={() => setShowFilters(false)}>
-                <CloseIcon />
-              </IconButton>
-            </Box>
-            
-            <Paper elevation={2} sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-              <Typography variant="h6" gutterBottom>Loại bất động sản</Typography>
-              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                <InputLabel>Loại bất động sản</InputLabel>
-                <Select
-                  value={searchParams.property_type}
-                  label="Loại bất động sản"
-                  onChange={(e) => handleFilterChange('property_type', e.target.value)}
-                >
-                  <MenuItem value="">Tất cả</MenuItem>
-                  {propertyTypes.map((type) => (
-                    <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              
-              <Typography variant="h6" gutterBottom>Vị trí</Typography>
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Tỉnh/Thành phố
+          {/* Results header */}
+          <Grid item xs={12}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+              <Typography variant="h5" component="h1">
+                {loading ? 'Đang tìm kiếm...' : `Tìm thấy ${totalCount} bất động sản`}
                 </Typography>
-                <LocationSelector 
-                  selectedLocation={searchParams.city_name}
-                  onLocationSelected={(id, name) => {
-                    handleFilterChange('city', id);
-                    handleFilterChange('city_name', name);
-                    handleFilterChange('district', '');
-                  }}
-                  placeholder="Chọn tỉnh thành"
-                  sx={{ width: '100%' }}
-                />
-              </Box>
               
-              <FormControl fullWidth size="small" sx={{ mb: 2 }} disabled={!searchParams.city}>
-                <InputLabel>Quận/Huyện</InputLabel>
-                <Select
-                  value={searchParams.district}
-                  label="Quận/Huyện"
-                  onChange={(e) => handleFilterChange('district', e.target.value)}
-                >
-                  <MenuItem value="">Tất cả</MenuItem>
-                  {districts.map((district) => (
-                    <MenuItem key={district} value={district}>{district}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              
-              <Typography variant="h6" gutterBottom>Khoảng giá</Typography>
-              <Box sx={{ px: 1 }}>
-                <Slider
-                  value={priceRange}
-                  onChange={handlePriceRangeChange}
-                  onChangeCommitted={handlePriceRangeChangeCommitted}
-                  min={0}
-                  max={20000000000}
-                  step={100000000}
-                  valueLabelDisplay="auto"
-                  valueLabelFormat={(value) => formatCurrency(value)}
-                />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                  <Typography variant="body2">{formatCurrency(priceRange[0])}</Typography>
-                  <Typography variant="body2">{formatCurrency(priceRange[1])}</Typography>
-                </Box>
-              </Box>
-              
-              <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Diện tích</Typography>
-              <Box sx={{ px: 1 }}>
-                <Slider
-                  value={areaRange}
-                  onChange={handleAreaRangeChange}
-                  onChangeCommitted={handleAreaRangeChangeCommitted}
-                  min={0}
-                  max={500}
-                  step={10}
-                  valueLabelDisplay="auto"
-                  valueLabelFormat={(value) => formatArea(value)}
-                />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                  <Typography variant="body2">{formatArea(areaRange[0])}</Typography>
-                  <Typography variant="body2">{formatArea(areaRange[1])}</Typography>
-                </Box>
-              </Box>
-              
-              <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Số phòng</Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Phòng ngủ</InputLabel>
-                    <Select
-                      value={searchParams.bedrooms}
-                      label="Phòng ngủ"
-                      onChange={(e) => handleFilterChange('bedrooms', e.target.value)}
-                    >
-                      <MenuItem value="">Tất cả</MenuItem>
-                      {[1, 2, 3, 4, 5].map((num) => (
-                        <MenuItem key={num} value={num}>{num}+</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={6}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Phòng tắm</InputLabel>
-                    <Select
-                      value={searchParams.bathrooms}
-                      label="Phòng tắm"
-                      onChange={(e) => handleFilterChange('bathrooms', e.target.value)}
-                    >
-                      <MenuItem value="">Tất cả</MenuItem>
-                      {[1, 2, 3, 4].map((num) => (
-                        <MenuItem key={num} value={num}>{num}+</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-              
-              <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Sắp xếp</Typography>
-              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                <InputLabel>Sắp xếp theo</InputLabel>
-                <Select
-                  value={searchParams.sort_by}
-                  label="Sắp xếp theo"
-                  onChange={(e) => handleFilterChange('sort_by', e.target.value)}
-                >
-                  <MenuItem value="created_at">Mới nhất</MenuItem>
-                  <MenuItem value="price">Giá</MenuItem>
-                  <MenuItem value="area">Diện tích</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth size="small">
-                <InputLabel>Thứ tự</InputLabel>
-                <Select
-                  value={searchParams.sort_direction}
-                  label="Thứ tự"
-                  onChange={(e) => handleFilterChange('sort_direction', e.target.value)}
-                >
-                  <MenuItem value="ASC">Tăng dần</MenuItem>
-                  <MenuItem value="DESC">Giảm dần</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <Box sx={{ mt: 3, mb: 2, display: 'flex', justifyContent: 'space-between' }}>
-                <Button 
-                  variant="contained" 
-                  color="primary" 
-                  onClick={applyFilters}
-                  fullWidth
-                >
-                  Áp dụng bộ lọc
-                </Button>
-              </Box>
-              
-              <Box sx={{ mt: 2, mb: 1 }}>
+              {/* Reset filters button */}
+              {(searchParams.keyword || searchParams.city || searchParams.district ||
+                searchParams.property_type || searchParams.bedrooms ||
+                searchParams.price_min || searchParams.price_max || 
+                searchParams.area_min || searchParams.area_max) && (
                 <Button 
                   variant="outlined" 
                   color="inherit" 
-                  onClick={resetFilters} 
                   size="small"
-                  fullWidth
+                  startIcon={<CloseIcon />}
+                  onClick={resetFilters}
                 >
                   Xóa bộ lọc
                 </Button>
-              </Box>
-            </Paper>
-          </Grid>
-          
-          {/* Results section */}
-          <Grid item xs={12} md={9}>
-            {/* Results count and sorting */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h6">
-                {loading ? 'Đang tìm kiếm...' : `Tìm thấy ${totalCount} bất động sản`}
-              </Typography>
-              
-              <Box sx={{ display: { xs: 'none', md: 'block' } }}>
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                  <InputLabel>Sắp xếp theo</InputLabel>
-                  <Select
-                    value={searchParams.sort_by}
-                    label="Sắp xếp theo"
-                    onChange={(e) => handleFilterChange('sort_by', e.target.value)}
-                  >
-                    <MenuItem value="created_at">Mới nhất</MenuItem>
-                    <MenuItem value="price">Giá</MenuItem>
-                    <MenuItem value="area">Diện tích</MenuItem>
-                  </Select>
-                </FormControl>
-                
-                <FormControl size="small" sx={{ minWidth: 120, ml: 1 }}>
-                  <InputLabel>Thứ tự</InputLabel>
-                  <Select
-                    value={searchParams.sort_direction}
-                    label="Thứ tự"
-                    onChange={(e) => handleFilterChange('sort_direction', e.target.value)}
-                  >
-                    <MenuItem value="ASC">Tăng dần</MenuItem>
-                    <MenuItem value="DESC">Giảm dần</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-              
-              <Button 
-                variant="outlined" 
-                startIcon={<TuneIcon />} 
-                onClick={() => setShowFilters(true)}
-                sx={{ display: { xs: 'block', md: 'none' } }}
-              >
-                Bộ lọc
-              </Button>
+              )}
             </Box>
             
-            {/* Active filters */}
-            {(searchParams.property_type || searchParams.city || searchParams.district || 
-              searchParams.bedrooms || searchParams.bathrooms || 
-              searchParams.price_min || searchParams.price_max || 
-              searchParams.area_min || searchParams.area_max) && (
-              <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {searchParams.property_type && (
+            {/* Active filters display */}
+            {(searchParams.city || searchParams.district || 
+              searchParams.property_type || searchParams.bedrooms || 
+              (searchParams.price_min && searchParams.price_min > 0) || 
+              (searchParams.price_max && searchParams.price_max < 20000000000) || 
+              (searchParams.area_min && searchParams.area_min > 0) || 
+              (searchParams.area_max && searchParams.area_max < 500)) && (
+              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 3 }}>
+                {searchParams.keyword && (
                   <Chip 
-                    label={propertyTypes.find(t => t.value === searchParams.property_type)?.label || searchParams.property_type} 
-                    onDelete={() => handleFilterChange('property_type', '')}
+                    label={`Từ khóa: ${searchParams.keyword}`} 
+                    onDelete={() => {
+                      const params = new URLSearchParams(location.search);
+                      params.delete('keyword');
+                      navigate(`/tim-kiem?${params.toString()}`);
+                    }}
                     color="primary"
                     variant="outlined"
                   />
                 )}
                 
-                {searchParams.city && (
+                {searchParams.city_name && (
                   <Chip 
-                    label={searchParams.city_name || searchParams.city}
+                    label={searchParams.city_name}
                     onDelete={() => {
-                      handleFilterChange('city', '');
-                      handleFilterChange('city_name', '');
-                      handleFilterChange('district', '');
+                      const params = new URLSearchParams(location.search);
+                      params.delete('city');
+                      params.delete('city_name');
+                      navigate(`/tim-kiem?${params.toString()}`);
                     }}
                     color="primary"
                     variant="outlined"
@@ -724,88 +439,106 @@ const SearchPage: React.FC = () => {
                 {searchParams.district && (
                   <Chip 
                     label={searchParams.district} 
-                    onDelete={() => handleFilterChange('district', '')}
+                    onDelete={() => {
+                      const params = new URLSearchParams(location.search);
+                      params.delete('district');
+                      navigate(`/tim-kiem?${params.toString()}`);
+                    }}
+                    color="primary"
+                    variant="outlined"
+                  />
+                )}
+                
+                {searchParams.property_type && (
+                  <Chip 
+                    label={searchParams.property_type === 'apartment' ? 'Căn hộ chung cư' : 
+                           searchParams.property_type === 'house' ? 'Nhà riêng' :
+                           searchParams.property_type === 'villa' ? 'Biệt thự' :
+                           searchParams.property_type === 'land' ? 'Đất nền' :
+                           searchParams.property_type === 'office' ? 'Văn phòng' :
+                           searchParams.property_type === 'shop' ? 'Mặt bằng kinh doanh' :
+                           searchParams.property_type} 
+                    onDelete={() => {
+                      const params = new URLSearchParams(location.search);
+                      params.delete('property_type');
+                      navigate(`/tim-kiem?${params.toString()}`);
+                    }}
+                    color="primary"
+                    variant="outlined"
                   />
                 )}
                 
                 {searchParams.bedrooms && (
                   <Chip 
-                    label={`${searchParams.bedrooms}+ phòng ngủ`} 
-                    onDelete={() => handleFilterChange('bedrooms', '')}
+                    label={`${searchParams.bedrooms}+ phòng ngủ`}
+                    onDelete={() => {
+                      const params = new URLSearchParams(location.search);
+                      params.delete('bedrooms');
+                      navigate(`/tim-kiem?${params.toString()}`);
+                    }}
+                    color="primary"
+                    variant="outlined"
                   />
                 )}
                 
-                {searchParams.bathrooms && (
-                  <Chip 
-                    label={`${searchParams.bathrooms}+ phòng tắm`} 
-                    onDelete={() => handleFilterChange('bathrooms', '')}
-                  />
-                )}
-                
-                {(searchParams.price_min || searchParams.price_max) && (
+                {(searchParams.price_min !== undefined || searchParams.price_max !== undefined) && (
                   <Chip 
                     label={`Giá: ${formatCurrency(searchParams.price_min || 0)} - ${formatCurrency(searchParams.price_max || 20000000000)}`} 
                     onDelete={() => {
-                      handleFilterChange('price_min', undefined);
-                      handleFilterChange('price_max', undefined);
-                      setPriceRange([0, 20000000000]);
+                      const params = new URLSearchParams(location.search);
+                      params.delete('price_min');
+                      params.delete('price_max');
+                      navigate(`/tim-kiem?${params.toString()}`);
                     }}
+                    color="primary"
+                    variant="outlined"
                   />
                 )}
                 
-                {(searchParams.area_min || searchParams.area_max) && (
+                {(searchParams.area_min !== undefined || searchParams.area_max !== undefined) && (
                   <Chip 
                     label={`Diện tích: ${formatArea(searchParams.area_min || 0)} - ${formatArea(searchParams.area_max || 500)}`} 
                     onDelete={() => {
-                      handleFilterChange('area_min', undefined);
-                      handleFilterChange('area_max', undefined);
-                      setAreaRange([0, 500]);
+                      const params = new URLSearchParams(location.search);
+                      params.delete('area_min');
+                      params.delete('area_max');
+                      navigate(`/tim-kiem?${params.toString()}`);
                     }}
+                    color="primary"
+                    variant="outlined"
                   />
                 )}
-                
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={resetFilters}
-                  startIcon={<CloseIcon />}
-                >
-                  Xóa tất cả
-                </Button>
-              </Box>
+              </Stack>
             )}
-            
+          </Grid>
+          
+          {/* Results display */}
+          <Grid item xs={12}>
             {/* Loading state */}
             {loading && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
                 <CircularProgress />
               </Box>
             )}
             
-            {/* Error state */}
-            {error && !loading && (
-              <Alert severity="error" sx={{ mb: 3 }}>
-                {error}
-              </Alert>
-            )}
-            
-            {/* Empty state */}
-            {!loading && !error && properties.length === 0 && (
-              <Paper sx={{ p: 4, textAlign: 'center', mb: 3 }}>
+            {/* No results state - shows for both errors and empty results */}
+            {!loading && properties.length === 0 && (
+              <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
+                <TravelExploreIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
                 <Typography variant="h6" gutterBottom>
                   Không tìm thấy bất động sản nào
                 </Typography>
-                <Typography variant="body1" color="text.secondary" gutterBottom>
-                  Không có bất động sản nào phù hợp với tiêu chí tìm kiếm của bạn.
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                  Vui lòng thử lại với các tiêu chí tìm kiếm khác hoặc mở rộng phạm vi tìm kiếm của bạn.
                 </Typography>
-                <Button variant="contained" onClick={resetFilters} sx={{ mt: 2 }}>
+                <Button variant="contained" onClick={resetFilters}>
                   Xóa bộ lọc
                 </Button>
               </Paper>
             )}
             
             {/* Results grid */}
-            {!loading && !error && properties.length > 0 && (
+            {!loading && properties.length > 0 && (
               <>
                 <Grid container spacing={3}>
                   {properties.map((property) => (

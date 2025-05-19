@@ -118,14 +118,24 @@ export const adminService = {
   /**
    * News Management
    */
-  getNews: async (page = 1, limit = 10) => {
+  getNews: async (page = 1, limit = 10, search = '', status = '') => {
     try {
       const response = await api.get('/api/admin/news', {
-        params: { page, limit }
+        params: { page, limit, search, status }
       });
       return response.data;
     } catch (error) {
       console.error('Error fetching news:', error);
+      throw error;
+    }
+  },
+
+  getNewsCategories: async () => {
+    try {
+      const response = await api.get('/api/news/categories');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching news categories:', error);
       throw error;
     }
   },

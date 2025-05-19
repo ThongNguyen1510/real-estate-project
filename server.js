@@ -4,6 +4,8 @@ const sql = require("mssql");
 const dotenv = require("dotenv");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
+const { updateExpiredProperties } = require('./utils/expirationJob');
+const { processScheduledAdminNotifications } = require('./utils/adminNotificationJob');
 
 dotenv.config(); // Tải các biến môi trường từ file .env
 
@@ -64,15 +66,57 @@ function authenticateToken(req, res, next) {
 const userRoutes = require("./routes/userRoutes");
 const propertiesRoutes = require("./routes/propertiesRoutes");
 const locationRoutes = require("./routes/locationRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const adminNotificationRoutes = require("./routes/adminNotificationRoutes");
 
 app.use("/api/auth", userRoutes);
 app.use("/api/properties", propertiesRoutes);
 app.use("/api/locations", locationRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/admin/notifications", adminNotificationRoutes);
 
 // Kiểm tra route gốc
 app.get("/", (req, res) => {
     res.send("🚀 Server đang chạy!");
 });
+
+// Khởi động job định kỳ để cập nhật các tin đăng hết hạn
+// Chạy job mỗi giờ để kiểm tra và cập nhật tin đăng hết hạn
+const ONE_HOUR = 60 * 60 * 1000; // 1 giờ tính bằng milliseconds
+setInterval(async () => {
+    try {
+        const updatedCount = await updateExpiredProperties();
+        console.log(`Job cập nhật tin đăng hết hạn đã chạy, ${updatedCount} tin đã được cập nhật.`);
+    } catch (error) {
+        console.error('Lỗi khi chạy job cập nhật tin đăng hết hạn:', error);
+    }
+}, ONE_HOUR);
+
+// Job gửi thông báo admin
+const FOUR_HOURS = 4 * 60 * 60 * 1000; // 4 giờ tính bằng milliseconds
+setInterval(async () => {
+    try {
+        const sentCount = await processScheduledAdminNotifications();
+        console.log(`Job gửi thông báo admin đã chạy, đã gửi ${sentCount} thông báo.`);
+    } catch (error) {
+        console.error('Lỗi khi chạy job gửi thông báo admin:', error);
+    }
+}, FOUR_HOURS);
+
+// Chạy job ngay khi khởi động server
+setTimeout(async () => {
+    try {
+        // Cập nhật tin đăng hết hạn
+        const updatedCount = await updateExpiredProperties();
+        console.log(`Job cập nhật tin đăng hết hạn đã chạy lần đầu, ${updatedCount} tin đã được cập nhật.`);
+        
+        // Gửi thông báo admin
+        const sentCount = await processScheduledAdminNotifications();
+        console.log(`Job gửi thông báo admin đã chạy lần đầu, đã gửi ${sentCount} thông báo.`);
+    } catch (error) {
+        console.error('Lỗi khi chạy job khởi động lần đầu:', error);
+    }
+}, 5000); // Chạy sau 5 giây khi server khởi động
 
 // Khởi động server
 const PORT = process.env.PORT || 5000;

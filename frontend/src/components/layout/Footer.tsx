@@ -39,9 +39,8 @@ const Footer: React.FC = () => {
       }}
     >
       <Container maxWidth="lg">
-        <Grid container spacing={4}>
-          {/* About section */}
-          <Grid item xs={12} sm={6} md={3}>
+        <Grid container spacing={4}>          {/* About section */}
+          <Grid item xs={12} sm={6} md={3} id="gioi-thieu">
             <Typography 
               variant="h6" 
               component="div" 
@@ -59,7 +58,7 @@ const Footer: React.FC = () => {
                 }
               }}
             >
-              Về BĐSN Việt Nam
+              Về BĐS Việt Nam
             </Typography>
             
             <Typography variant="body2" sx={{ mb: 2 }}>
@@ -183,9 +182,8 @@ const Footer: React.FC = () => {
               ))}
             </List>
           </Grid>
-          
-          {/* Contact section */}
-          <Grid item xs={12} sm={6} md={3}>
+            {/* Contact section */}
+          <Grid item xs={12} sm={6} md={3} id="lien-he">
             <Typography 
               variant="h6" 
               component="div" 
@@ -237,7 +235,7 @@ const Footer: React.FC = () => {
                 </ListItemIcon>
                 <ListItemText 
                   primary="Email" 
-                  secondary="info@bdsn.vn"
+                  secondary="info@bds.vn"
                   primaryTypographyProps={{ fontSize: 14, fontWeight: 'medium' }}
                   secondaryTypographyProps={{ fontSize: 14, color: 'rgba(255,255,255,0.7)' }}
                 />

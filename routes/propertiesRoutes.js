@@ -12,7 +12,9 @@ const {
   addToFavorites,
   removeFromFavorites,
   getFavoriteProperties,
-  createProperty
+  createProperty,
+  reportProperty,
+  renewProperty
 } = require('../controllers/propertyController');
 
 // Public routes
@@ -83,5 +85,11 @@ router.post('/', authenticateToken, addProperty);
 router.post('/create', authenticateToken, createProperty);
 router.put('/:id', authenticateToken, updateProperty);
 router.delete('/:id', authenticateToken, deleteProperty);
+
+// Report a property
+router.post("/:id/report", authenticateToken, reportProperty);
+
+// Renew an expired property
+router.post("/:id/renew", authenticateToken, renewProperty);
 
 module.exports = router;

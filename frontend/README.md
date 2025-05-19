@@ -101,4 +101,52 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Contact
 
-For any questions or suggestions, please feel free to contact us at example@domain.com. 
+For any questions or suggestions, please feel free to contact us at example@domain.com.
+
+## Setting Up Google Maps API
+
+To display property locations on a map, you need to set up a Google Maps API key:
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Navigate to "APIs & Services" > "Library"
+4. Search for and enable the following APIs:
+   - Maps JavaScript API
+   - Geocoding API
+   - Places API
+5. Go to "APIs & Services" > "Credentials"
+6. Click "Create Credentials" > "API Key"
+7. Copy your new API Key
+8. Create a file named `.env` in the `frontend` directory with the following content:
+
+```
+REACT_APP_GOOGLE_MAPS_API_KEY=YOUR_API_KEY_HERE
+```
+
+9. Replace `YOUR_API_KEY_HERE` with your actual Google Maps API key
+10. Restart your development server with `npm start`
+
+## Available Scripts
+
+In the project directory, you can run:
+
+### `npm start`
+
+Runs the app in the development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+
+The page will reload if you make edits.\
+You will also see any lint errors in the console.
+
+### `npm test`
+
+Launches the test runner in the interactive watch mode.\
+See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+
+### `npm run build`
+
+Builds the app for production to the `build` folder.\
+It correctly bundles React in production mode and optimizes the build for the best performance.
+
+The build is minified and the filenames include the hashes.\
+Your app is ready to be deployed! 

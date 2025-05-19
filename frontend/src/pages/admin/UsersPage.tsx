@@ -272,13 +272,20 @@ const UsersPage: React.FC = () => {
         setBannedUsers(updatedUsers.filter((user: User) => user.status === 'banned').length);
         
         handleCloseDeleteDialog();
+        
+        // Hiển thị thông báo thành công
+        setError(null);
+        // Nếu có setSuccess, có thể dùng setSuccess ở đây thay vì alert
+        alert(`Đã xóa người dùng ${selectedUser.name} thành công`);
       } else {
         // If API call was successful but contains an error message
-        setError(response?.message || 'Không thể xóa người dùng');
+        setError(response?.message || 'Không thể xóa người dùng. Vui lòng thử lại sau.');
+        handleCloseDeleteDialog();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete user:', error);
       setError('Lỗi kết nối tới máy chủ. Vui lòng thử lại sau');
+      handleCloseDeleteDialog();
     } finally {
       setLoading(false);
     }
@@ -358,7 +365,7 @@ const UsersPage: React.FC = () => {
   
   return (
     <AdminLayout title="Quản lý người dùng">
-      <Box sx={{ position: 'relative', mb: 4 }}>
+      <Box sx={{ position: 'relative', mb: 4, pl: 0 }}>
         <Typography variant="h4" component="h1" gutterBottom>
           Quản lý người dùng
         </Typography>
@@ -372,7 +379,7 @@ const UsersPage: React.FC = () => {
       )}
       
       {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={2} sx={{ mb: 3, ml: -1 }}>
         <Grid item xs={12} sm={4}>
           <Card sx={{ boxShadow: 3, borderLeft: 5, borderColor: 'primary.main' }}>
             <CardContent>
@@ -412,8 +419,8 @@ const UsersPage: React.FC = () => {
       </Grid>
       
       {/* Filters and Search */}
-      <Paper sx={{ p: 2, mb: 3, boxShadow: 3 }}>
-        <Grid container spacing={2} alignItems="center">
+      <Paper sx={{ p: 1.5, mb: 2, boxShadow: 3 }}>
+        <Grid container spacing={1} alignItems="center">
           <Grid item xs={12} md={4}>
             <TextField
               variant="outlined"
@@ -473,6 +480,7 @@ const UsersPage: React.FC = () => {
               startIcon={<RefreshIcon />}
               onClick={fetchUsers}
               fullWidth
+              size="small"
             >
               Làm mới
             </Button>
@@ -484,6 +492,7 @@ const UsersPage: React.FC = () => {
               startIcon={<PersonAddIcon />}
               fullWidth
               href="/admin/users/create"
+              size="small"
             >
               Thêm mới
             </Button>
@@ -495,10 +504,10 @@ const UsersPage: React.FC = () => {
       <Paper sx={{ boxShadow: 3 }}>
         {loading && <LinearProgress />}
         <TableContainer>
-          <Table sx={{ minWidth: 650 }} aria-label="users table">
+          <Table size="small" sx={{ minWidth: 650 }} aria-label="users table">
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
+                <TableCell padding="checkbox">ID</TableCell>
                 <TableCell>Tên người dùng</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Vai trò</TableCell>
@@ -560,8 +569,9 @@ const UsersPage: React.FC = () => {
                             color="primary" 
                             size="small"
                             onClick={() => handleOpenStatusDialog(user)}
+                            sx={{ p: 0.5 }}
                           >
-                            {user.status === 'active' ? <BlockIcon /> : <CheckCircleIcon />}
+                            {user.status === 'active' ? <BlockIcon fontSize="small" /> : <CheckCircleIcon fontSize="small" />}
                           </IconButton>
                         </Tooltip>
                         
@@ -570,8 +580,9 @@ const UsersPage: React.FC = () => {
                             color="secondary" 
                             size="small"
                             href={`/admin/users/edit/${user.id}`}
+                            sx={{ p: 0.5 }}
                           >
-                            <EditIcon />
+                            <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         
@@ -581,8 +592,9 @@ const UsersPage: React.FC = () => {
                             size="small"
                             onClick={() => handleOpenDeleteDialog(user)}
                             disabled={user.role === 'admin'} // Prevent admin deletion
+                            sx={{ p: 0.5 }}
                           >
-                            <DeleteIcon />
+                            <DeleteIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       </Box>
@@ -593,7 +605,7 @@ const UsersPage: React.FC = () => {
               {filteredUsers.length === 0 && !loading && (
                 <TableRow>
                   <TableCell colSpan={8} align="center">
-                    <Typography variant="body1" sx={{ py: 2 }}>
+                    <Typography variant="body2" sx={{ py: 1 }}>
                       Không tìm thấy người dùng nào
                     </Typography>
                   </TableCell>
@@ -611,21 +623,22 @@ const UsersPage: React.FC = () => {
           page={page}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          labelRowsPerPage="Số hàng mỗi trang:"
+          labelRowsPerPage="Số hàng:"
           labelDisplayedRows={({ from, to, count }) => 
             `${from}-${to} của ${count}`
           }
+          sx={{ py: 0 }}
         />
       </Paper>
       
       {/* Status Change Dialog */}
-      <Dialog open={openStatusDialog} onClose={handleCloseStatusDialog}>
-        <DialogTitle>Thay đổi trạng thái người dùng</DialogTitle>
+      <Dialog open={openStatusDialog} onClose={handleCloseStatusDialog} maxWidth="xs" fullWidth>
+        <DialogTitle>Thay đổi trạng thái</DialogTitle>
         <DialogContent>
-          <DialogContentText>
+          <DialogContentText variant="body2">
             Bạn đang thay đổi trạng thái của người dùng <strong>{selectedUser?.name}</strong>
           </DialogContentText>
-          <FormControl fullWidth sx={{ mt: 2 }}>
+          <FormControl fullWidth sx={{ mt: 2 }} size="small">
             <InputLabel id="new-status-label">Trạng thái mới</InputLabel>
             <Select
               labelId="new-status-label"
@@ -641,25 +654,25 @@ const UsersPage: React.FC = () => {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseStatusDialog}>Hủy</Button>
-          <Button onClick={handleUpdateStatus} variant="contained" color="primary">
+          <Button onClick={handleCloseStatusDialog} size="small">Hủy</Button>
+          <Button onClick={handleUpdateStatus} variant="contained" color="primary" size="small">
             Cập nhật
           </Button>
         </DialogActions>
       </Dialog>
       
       {/* Delete Confirmation Dialog */}
-      <Dialog open={openDeleteDialog} onClose={handleCloseDeleteDialog}>
+      <Dialog open={openDeleteDialog} onClose={handleCloseDeleteDialog} maxWidth="xs" fullWidth>
         <DialogTitle>Xác nhận xóa người dùng</DialogTitle>
         <DialogContent>
-          <DialogContentText>
+          <DialogContentText variant="body2">
             Bạn có chắc chắn muốn xóa người dùng <strong>{selectedUser?.name}</strong>?
             Hành động này không thể được hoàn tác.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDeleteDialog}>Hủy</Button>
-          <Button onClick={handleDeleteUser} variant="contained" color="error">
+          <Button onClick={handleCloseDeleteDialog} size="small">Hủy</Button>
+          <Button onClick={handleDeleteUser} variant="contained" color="error" size="small">
             Xóa
           </Button>
         </DialogActions>

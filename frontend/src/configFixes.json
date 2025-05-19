@@ -1,0 +1,24 @@
+{
+  "defaultCoordinates": {
+    "hoangMinhGiam": {
+      "latitude": 10.79695,
+      "longitude": 106.68820,
+      "address": "5 Hoàng Minh Giám, Phú Nhuận, TP.HCM"
+    },
+    "nguyen_thi_minh_khai": {
+      "latitude": 10.78514,
+      "longitude": 106.69338,
+      "address": "123 Nguyễn Thị Minh Khai, Quận 1, TP.HCM"
+    },
+    "le_van_sy": {
+      "latitude": 10.79007, 
+      "longitude": 106.67742,
+      "address": "268 Lê Văn Sỹ, Quận 3, TP.HCM"
+    },
+    "district1_center": {
+      "latitude": 10.77584,
+      "longitude": 106.70333,
+      "address": "Trung tâm Quận 1, TP.HCM"
+    }
+  }
+} 

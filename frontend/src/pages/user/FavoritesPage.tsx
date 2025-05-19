@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Container, Typography, Grid, Box, Paper, CircularProgress, Button, Alert } from '@mui/material';
 import { Favorite as FavoriteIcon, Refresh as RefreshIcon } from '@mui/icons-material';
-import { getFavorites } from '../../services/api/userService';
+import userService from '../../services/api/userService';
 import { useFavorites } from '../../contexts/FavoritesContext';
 import PropertyCard from '../../components/property/PropertyCard';
 
@@ -40,7 +40,7 @@ const FavoritesPage: React.FC = () => {
     setError(null);
 
     try {
-      const response = await getFavorites();
+      const response = await userService.getFavorites();
       console.log('Favorites response:', response);
       
       if (response.success && response.data) {

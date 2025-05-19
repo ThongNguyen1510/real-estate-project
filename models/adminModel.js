@@ -1,10 +1,29 @@
 const { sql, connectToDatabase } = require('../config/database');
 
 // Lấy danh sách người dùng (có phân trang)
-const getUsers = async (page = 1, limit = 10, search = '') => {
+const getUsers = async (page = 1, limit = 10, search = '', userId = null) => {
     try {
         const offset = (page - 1) * limit;
         const pool = await connectToDatabase();
+        
+        // Nếu có userId, lấy thông tin chi tiết của người dùng đó
+        if (userId) {
+            const user = await pool.request()
+                .input('userId', sql.Int, userId)
+                .query(`
+                    SELECT id, username, name, email, phone, role, status, 
+                           last_login, created_at, avatar_url
+                    FROM Users
+                    WHERE id = @userId
+                `);
+                
+            return {
+                users: user.recordset,
+                total: user.recordset.length,
+                page: 1,
+                limit: 1
+            };
+        }
         
         const users = await pool.request()
             .input('offset', sql.Int, offset)
@@ -58,6 +77,114 @@ const updateUserStatus = async (userId, status) => {
         return result.rowsAffected[0] > 0;
     } catch (error) {
         console.error('Lỗi update user status:', error);
+        throw error;
+    }
+};
+
+// Xóa người dùng
+const deleteUserById = async (userId) => {
+    try {
+        const pool = await connectToDatabase();
+        
+        // Danh sách tất cả các bảng cần xóa liên quan đến người dùng
+        const tables = [
+            { name: 'Messages', condition: 'sender_id = @userId OR receiver_id = @userId' },
+            { name: 'Reviews', condition: 'user_id = @userId' },
+            { name: 'PropertyReports', condition: 'user_id = @userId' },
+            { name: 'Notifications', condition: 'user_id = @userId' },
+            { name: 'Favorites', condition: 'user_id = @userId' },
+            { name: 'SearchHistory', condition: 'user_id = @userId' }
+        ];
+        
+        // Xóa dữ liệu từ các bảng liên quan
+        for (const table of tables) {
+            try {
+                // Kiểm tra xem bảng có tồn tại không
+                const tableCheck = await pool.request().query(`
+                    SELECT OBJECT_ID('${table.name}') AS TableID
+                `);
+                
+                if (tableCheck.recordset[0].TableID !== null) {
+                    await pool.request()
+                        .input('userId', sql.Int, userId)
+                        .query(`DELETE FROM ${table.name} WHERE ${table.condition}`);
+                }
+            } catch (error) {
+                console.warn(`Không thể xóa dữ liệu từ bảng ${table.name}:`, error.message);
+                // Tiếp tục quy trình xóa dù có lỗi
+            }
+        }
+        
+        // Lấy danh sách bất động sản của người dùng
+        try {
+            const properties = await pool.request()
+                .input('userId', sql.Int, userId)
+                .query(`
+                    SELECT id FROM Properties WHERE owner_id = @userId
+                `);
+            
+            // Xóa dữ liệu liên quan đến từng bất động sản
+            for (const property of properties.recordset) {
+                const propertyId = property.id;
+                
+                // Danh sách các bảng liên quan đến bất động sản
+                const propertyTables = [
+                    { name: 'PropertyImages', condition: 'property_id = @propertyId' },
+                    { name: 'PropertyFeatures', condition: 'property_id = @propertyId' },
+                    { name: 'PropertyReports', condition: 'property_id = @propertyId' }
+                ];
+                
+                // Xóa dữ liệu từ các bảng liên quan đến bất động sản
+                for (const table of propertyTables) {
+                    try {
+                        // Kiểm tra xem bảng có tồn tại không
+                        const tableCheck = await pool.request().query(`
+                            SELECT OBJECT_ID('${table.name}') AS TableID
+                        `);
+                        
+                        if (tableCheck.recordset[0].TableID !== null) {
+                            await pool.request()
+                                .input('propertyId', sql.Int, propertyId)
+                                .query(`DELETE FROM ${table.name} WHERE ${table.condition}`);
+                        }
+                    } catch (error) {
+                        console.warn(`Không thể xóa dữ liệu từ bảng ${table.name}:`, error.message);
+                    }
+                }
+                
+                // Xóa vị trí của bất động sản
+                try {
+                    await pool.request()
+                        .input('propertyId', sql.Int, propertyId)
+                        .query(`
+                            DELETE FROM Locations
+                            WHERE id IN (SELECT location_id FROM Properties WHERE id = @propertyId)
+                        `);
+                } catch (error) {
+                    console.warn('Không thể xóa vị trí của bất động sản:', error.message);
+                }
+                
+                // Xóa bất động sản
+                try {
+                    await pool.request()
+                        .input('propertyId', sql.Int, propertyId)
+                        .query(`DELETE FROM Properties WHERE id = @propertyId`);
+                } catch (error) {
+                    console.warn('Không thể xóa bất động sản:', error.message);
+                }
+            }
+        } catch (error) {
+            console.warn('Lỗi khi xử lý bất động sản của người dùng:', error.message);
+        }
+        
+        // Cuối cùng, xóa người dùng (trừ admin)
+        const result = await pool.request()
+            .input('userId', sql.Int, userId)
+            .query(`DELETE FROM Users WHERE id = @userId AND role != 'admin'`);
+            
+        return result.rowsAffected[0] > 0;
+    } catch (error) {
+        console.error('Lỗi delete user:', error);
         throw error;
     }
 };
@@ -223,6 +350,7 @@ const getStatistics = async () => {
 module.exports = {
     getUsers,
     updateUserStatus,
+    deleteUserById,
     getProperties,
     updatePropertyStatus,
     getReports,

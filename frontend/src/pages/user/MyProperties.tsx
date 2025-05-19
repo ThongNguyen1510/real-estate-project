@@ -44,7 +44,8 @@ import {
   Share as ShareIcon,
   Flag as FlagIcon
 } from '@mui/icons-material';
-import { userService, propertyService } from '../../services/api';
+import { userService } from '../../services/api';
+import propertyService from '../../services/api/propertyService';
 import { getLocationNames } from '../../services/api/locationService';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDate, formatPrice } from '../../utils/format';
@@ -63,6 +64,7 @@ interface Property {
   status: string;
   status_display: string;
   created_at: string;
+  expiration_date?: string;
   address: string;
   city: string;
   city_name?: string;
@@ -143,9 +145,6 @@ const MyProperties = () => {
         // Pending listings
         setFilteredProperties(properties.filter(p => p.status === 'pending'));
       } else if (tabValue === 3) {
-        // Sold/rented listings
-        setFilteredProperties(properties.filter(p => ['sold', 'rented'].includes(p.status)));
-      } else if (tabValue === 4) {
         // Expired/maintenance listings
         setFilteredProperties(properties.filter(p => ['expired', 'maintenance'].includes(p.status)));
       }
@@ -337,6 +336,25 @@ const MyProperties = () => {
     return 'Không có địa chỉ';
   };
   
+  // Add a renewal function
+  const handleRenewListing = async (propertyId: number) => {
+    try {
+      setLoading(true);
+      const response = await propertyService.renewProperty(propertyId.toString());
+      
+      if (response.success) {
+        fetchProperties();
+        setError(null);
+      } else {
+        setError(response.message || 'Không thể gia hạn tin đăng');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Đã xảy ra lỗi khi gia hạn tin đăng');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -373,8 +391,7 @@ const MyProperties = () => {
           <Tab label="Tất cả" />
           <Tab label="Đang hiển thị" />
           <Tab label="Đang chờ duyệt" />
-          <Tab label="Đã bán/Đã thuê" />
-          <Tab label="Hết hạn/Bảo trì" />
+          <Tab label="Hết hạn" />
         </Tabs>
       </Paper>
       
@@ -391,10 +408,6 @@ const MyProperties = () => {
       </TabPanel>
       
       <TabPanel value={tabValue} index={3}>
-        {renderPropertyList()}
-      </TabPanel>
-      
-      <TabPanel value={tabValue} index={4}>
         {renderPropertyList()}
       </TabPanel>
       
@@ -486,6 +499,10 @@ const MyProperties = () => {
                 <TableCell>Địa chỉ</TableCell>
                 <TableCell align="center">Giá</TableCell>
                 <TableCell align="center">Trạng thái</TableCell>
+                {/* Add expiration date column when viewing the Expired tab */}
+                {tabValue === 3 && (
+                  <TableCell align="center">Ngày hết hạn</TableCell>
+                )}
                 <TableCell align="center">Ngày đăng</TableCell>
                 <TableCell align="center">Thao tác</TableCell>
               </TableRow>
@@ -495,7 +512,11 @@ const MyProperties = () => {
                 <TableRow key={property.id} sx={{
                   '&:hover': {
                     backgroundColor: 'rgba(0, 0, 0, 0.04)'
-                  }
+                  },
+                  // Add light red background for expired listings
+                  ...(property.status === 'expired' && {
+                    backgroundColor: 'rgba(244, 67, 54, 0.05)'
+                  })
                 }}>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -544,6 +565,12 @@ const MyProperties = () => {
                       color={getStatusColor(property.status) as any}
                     />
                   </TableCell>
+                  {/* Add expiration date column when viewing the Expired tab */}
+                  {tabValue === 3 && (
+                    <TableCell align="center">
+                      {property.expiration_date ? formatDate(property.expiration_date) : 'Không xác định'}
+                    </TableCell>
+                  )}
                   <TableCell align="center">
                     {formatDate(property.created_at)}
                   </TableCell>
@@ -559,6 +586,7 @@ const MyProperties = () => {
                           <VisibilityIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
+                      
                       <Tooltip title="Chỉnh sửa tin đăng">
                         <IconButton 
                           size="small" 
@@ -570,6 +598,21 @@ const MyProperties = () => {
                           <EditIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
+                      
+                      {/* Add renew button for expired listings */}
+                      {property.status === 'expired' && (
+                        <Tooltip title="Gia hạn tin đăng">
+                          <IconButton 
+                            size="small" 
+                            color="success"
+                            sx={{ mx: 0.5 }}
+                            onClick={() => handleRenewListing(property.id)}
+                          >
+                            <AddIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      
                       <Tooltip title="Xóa tin đăng">
                         <IconButton 
                           size="small" 
