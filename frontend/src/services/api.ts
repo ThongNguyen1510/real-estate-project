@@ -108,7 +108,7 @@ export const authService = {
     return response.data;
   },
   changePassword: async (currentPassword: string, newPassword: string) => {
-    const response = await api.post('/api/users/change-password', { currentPassword, newPassword });
+    const response = await api.post('/api/users/changePassword', { current_password: currentPassword, new_password: newPassword });
     return response.data;
   },
   logout: () => {

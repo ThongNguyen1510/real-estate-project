@@ -13,10 +13,12 @@ const HeroSection: React.FC = () => {
     <Box
       sx={{
         position: 'relative',
-        height: { xs: '300px', md: '350px' },
-        backgroundImage: 'url(/img/hero-bg.jpg)',
+        height: { xs: '300px', md: '400px' },
+        backgroundImage: 'url(/img/wallpaperhcm.png)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundColor: '#555',
         color: 'white',
         display: 'flex',
         alignItems: 'center',
@@ -28,7 +30,7 @@ const HeroSection: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)'
+          backgroundColor: 'rgba(0, 0, 0, 0.2)'
         }
       }}
     >

@@ -104,6 +104,19 @@ const SearchHeader: React.FC<SearchHeaderProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   
+  // Extract listing_type from URL when component mounts
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const listingType = params.get('listing_type');
+    
+    if (listingType === 'rent' || listingType === 'sale') {
+      setSearchValues(prev => ({
+        ...prev,
+        listing_type: listingType
+      }));
+    }
+  }, [location.search]);
+  
   // Get initial values from URL if not provided in props
   const getInitialValueFromUrl = (param: string, defaultValue: any = '') => {
     if (initialValues && initialValues[param as keyof typeof initialValues] !== undefined) {
@@ -129,16 +142,6 @@ const SearchHeader: React.FC<SearchHeaderProps> = ({
     bedrooms: getInitialValueFromUrl('bedrooms', ''),
     bathrooms: getInitialValueFromUrl('bathrooms', ''),
   });
-  
-  // Effect to update listing_type when transactionType prop changes
-  useEffect(() => {
-    if (transactionType) {
-      setSearchValues(prev => ({
-        ...prev,
-        listing_type: transactionType
-      }));
-    }
-  }, [transactionType]);
   
   // State for the price filter popover
   const [priceAnchorEl, setPriceAnchorEl] = useState<HTMLElement | null>(null);
@@ -602,22 +605,43 @@ const SearchHeader: React.FC<SearchHeaderProps> = ({
                             <Typography variant="subtitle2" gutterBottom>
                               Số phòng ngủ
                             </Typography>
-                            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                            <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 1 }}>
                               <Chip 
                                 label="Tất cả" 
                                 variant={!searchValues.bedrooms ? "filled" : "outlined"}
                                 color={!searchValues.bedrooms ? "primary" : "default"}
                                 onClick={() => setBedrooms('')}
                               />
-                              {[1, 2, 3, 4, 5].map(count => (
-                                <Chip 
-                                  key={count}
-                                  label={count.toString()} 
-                                  variant={Number(searchValues.bedrooms) === count ? "filled" : "outlined"}
-                                  color={Number(searchValues.bedrooms) === count ? "primary" : "default"}
-                                  onClick={() => setBedrooms(count)}
-                                />
-                              ))}
+                              <Chip 
+                                label="1" 
+                                variant={Number(searchValues.bedrooms) === 1 ? "filled" : "outlined"}
+                                color={Number(searchValues.bedrooms) === 1 ? "primary" : "default"}
+                                onClick={() => setBedrooms(1)}
+                              />
+                              <Chip 
+                                label="2" 
+                                variant={Number(searchValues.bedrooms) === 2 ? "filled" : "outlined"}
+                                color={Number(searchValues.bedrooms) === 2 ? "primary" : "default"}
+                                onClick={() => setBedrooms(2)}
+                              />
+                              <Chip 
+                                label="3" 
+                                variant={Number(searchValues.bedrooms) === 3 ? "filled" : "outlined"}
+                                color={Number(searchValues.bedrooms) === 3 ? "primary" : "default"}
+                                onClick={() => setBedrooms(3)}
+                              />
+                              <Chip 
+                                label="4" 
+                                variant={Number(searchValues.bedrooms) === 4 ? "filled" : "outlined"}
+                                color={Number(searchValues.bedrooms) === 4 ? "primary" : "default"}
+                                onClick={() => setBedrooms(4)}
+                              />
+                              <Chip 
+                                label="5+" 
+                                variant={Number(searchValues.bedrooms) === 5 ? "filled" : "outlined"}
+                                color={Number(searchValues.bedrooms) === 5 ? "primary" : "default"}
+                                onClick={() => setBedrooms(5)}
+                              />
                             </Stack>
                             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
                               <Button onClick={() => setBedroomAnchorEl(null)} size="small">

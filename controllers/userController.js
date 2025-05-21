@@ -80,12 +80,23 @@ const registerUser = async (req, res) => {
 
 // Đăng nhập
 const loginUser = async (req, res) => {
-    const { username, password } = req.body;
+    // Chấp nhận cả username và identifier để tương thích với frontend cũ và mới
+    const { username, identifier, password } = req.body;
+    
+    // Xác định giá trị đăng nhập (username hoặc identifier)
+    const loginValue = identifier || username;
+    
+    if (!loginValue || !password) {
+        return res.status(400).json({
+            success: false,
+            message: 'Vui lòng cung cấp thông tin đăng nhập và mật khẩu'
+        });
+    }
     
     try {
-        // Tìm user theo username hoặc email
+        // Tìm user theo username, email hoặc phone
         const result = await sql.query`
-            SELECT * FROM Users WHERE username = ${username} OR email = ${username}
+            SELECT * FROM Users WHERE username = ${loginValue} OR email = ${loginValue} OR phone = ${loginValue}
         `;
 
         const user = result.recordset[0];
@@ -93,7 +104,7 @@ const loginUser = async (req, res) => {
         if (!user) {
             return res.status(401).json({
                 success: false,
-                message: 'Username/Email hoặc mật khẩu không đúng'
+                message: 'SĐT/Email hoặc mật khẩu không đúng'
             });
         }
 
@@ -102,7 +113,7 @@ const loginUser = async (req, res) => {
         if (!isPasswordValid) {
             return res.status(401).json({
                 success: false,
-                message: 'Username/Email hoặc mật khẩu không đúng'
+                message: 'SĐT/Email hoặc mật khẩu không đúng'
             });
         }
 
