@@ -90,12 +90,12 @@ const createPropertyReport = async (reportData) => {
                     for (const admin of adminResult.recordset) {
                         const notificationQuery = `
                             INSERT INTO Notifications (
-                                user_id, type, title, content, 
-                                related_entity_type, related_entity_id, is_read, created_at
+                                user_id, title, message, 
+                                notification_type, reference_id, is_read, created_at
                             )
                             VALUES (
-                                @admin_id, 'property', 'Báo cáo tin đăng mới', 
-                                @notification_content, 'report', @report_id, 0, GETDATE()
+                                @admin_id, 'Báo cáo tin đăng mới', 
+                                @notification_content, 'property_report', @report_id, 0, GETDATE()
                             )
                         `;
                         
@@ -110,17 +110,18 @@ const createPropertyReport = async (reportData) => {
                 // Gửi thông báo cho chủ sở hữu property
                 const ownerNotificationQuery = `
                     INSERT INTO Notifications (
-                        user_id, type, title, content, 
-                        related_entity_type, related_entity_id, is_read, created_at
+                        user_id, title, message, 
+                        notification_type, reference_id, is_read, created_at
                     )
                     VALUES (
-                        @owner_id, 'property', 'Tin đăng của bạn bị báo cáo', 
-                        @owner_notification_content, 'property', @property_id_for_notification, 0, GETDATE()
+                        @owner_id, @owner_title, @owner_content, 
+                        'property', @property_id_for_notification, 0, GETDATE()
                     )
                 `;
                 
                 request.input('owner_id', sql.Int, propertyInfo.recordset[0].owner_id);
-                request.input('owner_notification_content', sql.NVarChar, `Tin đăng "${propertyTitle}" của bạn đã bị báo cáo. Quản trị viên sẽ xem xét báo cáo này.`);
+                request.input('owner_title', sql.NVarChar, `Tin đăng "${propertyTitle}" của bạn đã bị báo cáo`);
+                request.input('owner_content', sql.NVarChar, `Tin đăng "${propertyTitle}" của bạn đã bị báo cáo. Quản trị viên sẽ xem xét báo cáo này.`);
                 request.input('property_id_for_notification', sql.Int, property_id);
                 
                 await request.query(ownerNotificationQuery);
@@ -357,12 +358,12 @@ const updateReportStatus = async (reportId, updateData) => {
                 if (reporterTitle) {
                     const reporterNotificationQuery = `
                         INSERT INTO Notifications (
-                            user_id, type, title, content, 
-                            related_entity_type, related_entity_id, is_read, created_at
+                            user_id, title, message, 
+                            notification_type, reference_id, is_read, created_at
                         )
                         VALUES (
-                            @reporter_id, 'property', @reporter_title, 
-                            @reporter_content, 'report', @report_id_for_notification, 0, GETDATE()
+                            @reporter_id, @reporter_title, 
+                            @reporter_content, 'property_report', @report_id_for_notification, 0, GETDATE()
                         )
                     `;
                     
@@ -389,12 +390,12 @@ const updateReportStatus = async (reportId, updateData) => {
                     
                     const ownerNotificationQuery = `
                         INSERT INTO Notifications (
-                            user_id, type, title, content, 
-                            related_entity_type, related_entity_id, is_read, created_at
+                            user_id, title, message, 
+                            notification_type, reference_id, is_read, created_at
                         )
                         VALUES (
-                            @owner_id, 'property', @owner_title, 
-                            @owner_content, 'property', @property_id_for_notification, 0, GETDATE()
+                            @owner_id, @owner_title, @owner_content, 
+                            'property', @property_id_for_notification, 0, GETDATE()
                         )
                     `;
                     

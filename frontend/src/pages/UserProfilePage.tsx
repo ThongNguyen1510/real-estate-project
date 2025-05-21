@@ -468,48 +468,6 @@ const UserProfilePage: React.FC = () => {
               
               <Divider sx={{ my: 2 }} />
               
-              {/* Profile stats */}
-              <Grid container spacing={2} sx={{ mt: 2 }}>
-                <Grid item xs={6}>
-                  <Paper 
-                    sx={{ 
-                      p: 2, 
-                      bgcolor: 'action.hover',
-                      position: 'relative',
-                      minHeight: 80
-                    }}
-                  >
-                    {countsLoading ? (
-                      <CircularProgress size={20} sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
-                    ) : (
-                      <>
-                        <Typography variant="h6" fontWeight="bold">{propertiesCount}</Typography>
-                    <Typography variant="body2" color="text.secondary">Tin đăng</Typography>
-                      </>
-                    )}
-                  </Paper>
-                </Grid>
-                <Grid item xs={6}>
-                  <Paper 
-                    sx={{ 
-                      p: 2, 
-                      bgcolor: 'action.hover',
-                      position: 'relative',
-                      minHeight: 80
-                    }}
-                  >
-                    {countsLoading ? (
-                      <CircularProgress size={20} sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
-                    ) : (
-                      <>
-                        <Typography variant="h6" fontWeight="bold">{favoritesCount}</Typography>
-                    <Typography variant="body2" color="text.secondary">Yêu thích</Typography>
-                      </>
-                    )}
-                  </Paper>
-                </Grid>
-              </Grid>
-              
               <Button 
                 variant="outlined"
                 color="error"

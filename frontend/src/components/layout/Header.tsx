@@ -107,8 +107,8 @@ const Header: React.FC = () => {
   };
 
   const menuItems: MenuItem[] = [
-    { title: 'Trang chủ', path: '/', icon: <HomeIcon /> },
-    { title: 'Tìm kiếm', path: '/tim-kiem', icon: <SearchIcon /> },
+    { title: 'Nhà đất bán', path: '/tim-kiem?listing_type=sale', icon: <HomeIcon /> },
+    { title: 'Nhà đất cho thuê', path: '/tim-kiem?listing_type=rent', icon: <HomeIcon /> },
     { title: 'Bản đồ', path: '/ban-do', icon: <MapIcon /> },
     { title: 'Đăng tin', path: '/dang-tin', icon: <AddIcon /> },
     { title: 'Tin tức', path: '/tin-tuc', icon: <NewsIcon /> },
@@ -284,7 +284,11 @@ const Header: React.FC = () => {
                   className={
                     item.path.startsWith('#') 
                       ? location.hash === item.path ? 'active' : ''
-                      : location.pathname === item.path ? 'active' : ''
+                      : item.path.includes('listing_type=rent') && location.search.includes('listing_type=rent')
+                        ? 'active'
+                        : item.path.includes('listing_type=sale') && location.search.includes('listing_type=sale')
+                          ? 'active'
+                          : location.pathname === item.path ? 'active' : ''
                   }
                 >
                   {item.title}

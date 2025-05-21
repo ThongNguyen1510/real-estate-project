@@ -78,9 +78,9 @@ const LoginPage: React.FC = () => {
       password: ''
     };
     
-    // Validate username/email
+    // Validate phone/email
     if (!formData.email) {
-      errors.email = 'Username hoặc Email không được để trống';
+      errors.email = 'Số điện thoại hoặc Email không được để trống';
       isValid = false;
     }
     
@@ -116,8 +116,13 @@ const LoginPage: React.FC = () => {
       const response = await login(formData.email, formData.password);
       console.log('Đăng nhập thành công:', response);
       
-      // Chuyển hướng ngay sau khi đăng nhập thành công
-      navigate('/');
+      // Chỉ chuyển hướng khi đăng nhập thành công
+      if (response && response.success !== false) {
+        navigate('/');
+      } else {
+        // Hiển thị lỗi từ server nếu có
+        setError(response.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin đăng nhập.');
+      }
     } catch (err: any) {
       console.error('Login error:', err);
       
@@ -126,10 +131,13 @@ const LoginPage: React.FC = () => {
       
       if (errorMessage.includes('username') || 
           errorMessage.includes('email') || 
+          errorMessage.includes('phone') ||
+          errorMessage.includes('sđt') ||
+          errorMessage.includes('điện thoại') ||
           errorMessage.includes('tài khoản')) {
         setValidationErrors(prev => ({
           ...prev,
-          email: 'Tên đăng nhập hoặc email không chính xác'
+          email: 'Số điện thoại hoặc email không chính xác'
         }));
       }
       
@@ -177,12 +185,12 @@ const LoginPage: React.FC = () => {
             <TextField
               fullWidth
               margin="normal"
-              label="Username hoặc Email"
+              label="SĐT hoặc Email"
               name="email"
               value={formData.email}
               onChange={handleChange}
               error={!!validationErrors.email}
-              helperText={validationErrors.email || 'Nhập username hoặc email để đăng nhập'}
+              helperText={validationErrors.email || ''}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
