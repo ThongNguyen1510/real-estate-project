@@ -25,4 +25,7 @@ router.delete('/:id', adminNotificationController.deleteAdminNotification);
 // Gửi thông báo
 router.post('/:id/send', adminNotificationController.sendAdminNotification);
 
+// Chuyển đổi trạng thái nổi bật của thông báo
+router.put('/:id/feature', adminNotificationController.toggleFeatureStatus);
+
 module.exports = router; 

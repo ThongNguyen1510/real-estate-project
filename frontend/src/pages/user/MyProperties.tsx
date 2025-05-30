@@ -42,7 +42,8 @@ import {
   Home as HomeIcon,
   Add as AddIcon,
   Share as ShareIcon,
-  Flag as FlagIcon
+  Flag as FlagIcon,
+  HelpOutline as HelpOutlineIcon
 } from '@mui/icons-material';
 import { userService } from '../../services/api';
 import propertyService from '../../services/api/propertyService';
@@ -65,6 +66,7 @@ interface Property {
   status_display: string;
   created_at: string;
   expiration_date?: string;
+  expires_at?: string;
   address: string;
   city: string;
   city_name?: string;
@@ -269,7 +271,7 @@ const MyProperties = () => {
       'pending': 'warning',
       'sold': 'error',
       'rented': 'error',
-      'expired': 'default',
+      'expired': 'error',
       'maintenance': 'info'
     };
     
@@ -355,6 +357,18 @@ const MyProperties = () => {
     }
   };
   
+  // Format date helper function
+  const customFormatDate = (dateStr: string | undefined) => {
+    if (!dateStr) return 'Không xác định';
+    
+    try {
+      const date = new Date(dateStr);
+      return formatDate(date.toString()); 
+    } catch(err) {
+      return 'Định dạng không hợp lệ';
+    }
+  };
+  
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -391,7 +405,21 @@ const MyProperties = () => {
           <Tab label="Tất cả" />
           <Tab label="Đang hiển thị" />
           <Tab label="Đang chờ duyệt" />
-          <Tab label="Hết hạn" />
+          <Tab 
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <span>Hết hạn</span>
+                {properties.filter(p => p.status === 'expired').length > 0 && (
+                  <Chip 
+                    label={properties.filter(p => p.status === 'expired').length} 
+                    color="error" 
+                    size="small" 
+                    sx={{ ml: 1, height: 20, minWidth: 20 }} 
+                  />
+                )}
+              </Box>
+            } 
+          />
         </Tabs>
       </Paper>
       
@@ -448,7 +476,18 @@ const MyProperties = () => {
                 <TableCell>Tin đăng</TableCell>
                 <TableCell>Địa chỉ</TableCell>
                 <TableCell align="center">Giá</TableCell>
-                <TableCell align="center">Trạng thái</TableCell>
+                <TableCell align="center">
+                  <Tooltip title="Hiển thị: đang hiển thị trên website, Chờ duyệt: đang đợi xét duyệt, Hết hạn: tin đã hết hạn">
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span>Trạng thái</span>
+                      <HelpOutlineIcon fontSize="small" sx={{ ml: 0.5, fontSize: '16px' }} />
+                    </Box>
+                  </Tooltip>
+                </TableCell>
+                {/* Add expiration date column when viewing the Expired tab */}
+                {tabValue === 3 && (
+                  <TableCell align="center">Ngày hết hạn</TableCell>
+                )}
                 <TableCell align="center">Ngày đăng</TableCell>
                 <TableCell align="center">Thao tác</TableCell>
               </TableRow>
@@ -498,7 +537,14 @@ const MyProperties = () => {
                 <TableCell>Tin đăng</TableCell>
                 <TableCell>Địa chỉ</TableCell>
                 <TableCell align="center">Giá</TableCell>
-                <TableCell align="center">Trạng thái</TableCell>
+                <TableCell align="center">
+                  <Tooltip title="Hiển thị: đang hiển thị trên website, Chờ duyệt: đang đợi xét duyệt, Hết hạn: tin đã hết hạn">
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span>Trạng thái</span>
+                      <HelpOutlineIcon fontSize="small" sx={{ ml: 0.5, fontSize: '16px' }} />
+                    </Box>
+                  </Tooltip>
+                </TableCell>
                 {/* Add expiration date column when viewing the Expired tab */}
                 {tabValue === 3 && (
                   <TableCell align="center">Ngày hết hạn</TableCell>
@@ -515,7 +561,7 @@ const MyProperties = () => {
                   },
                   // Add light red background for expired listings
                   ...(property.status === 'expired' && {
-                    backgroundColor: 'rgba(244, 67, 54, 0.05)'
+                    backgroundColor: 'rgba(244, 67, 54, 0.08)'
                   })
                 }}>
                   <TableCell>
@@ -560,7 +606,7 @@ const MyProperties = () => {
                   </TableCell>
                   <TableCell align="center">
                     <Chip 
-                      label={property.status_display} 
+                      label={property.status === 'expired' ? 'Hết hạn' : property.status_display} 
                       size="small" 
                       color={getStatusColor(property.status) as any}
                     />
@@ -568,7 +614,7 @@ const MyProperties = () => {
                   {/* Add expiration date column when viewing the Expired tab */}
                   {tabValue === 3 && (
                     <TableCell align="center">
-                      {property.expiration_date ? formatDate(property.expiration_date) : 'Không xác định'}
+                      {property.expires_at ? customFormatDate(property.expires_at) : property.expiration_date ? customFormatDate(property.expiration_date) : 'Không xác định'}
                     </TableCell>
                   )}
                   <TableCell align="center">

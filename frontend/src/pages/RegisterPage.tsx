@@ -10,7 +10,6 @@ import {
   Divider,
   InputAdornment,
   IconButton,
-  Alert,
   Grid,
   FormControlLabel,
   Checkbox,
@@ -29,6 +28,7 @@ import {
   Google as GoogleIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import ErrorAlert from '../components/common/ErrorAlert';
 
 interface FormData {
   fullName: string;
@@ -117,11 +117,21 @@ const RegisterPage: React.FC = () => {
         isValid = false;
       }
       
+      // Enhanced email validation
       if (!formData.email) {
         errors.email = 'Email không được để trống';
         isValid = false;
-      } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-        errors.email = 'Email không hợp lệ';
+      } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(formData.email)) {
+        errors.email = 'Email không hợp lệ. Vui lòng nhập đúng định dạng (vd: example@domain.com)';
+        isValid = false;
+      } else if (formData.email.length > 255) {
+        errors.email = 'Email không được vượt quá 255 ký tự';
+        isValid = false;
+      } else if (formData.email.indexOf('@') <= 0) {
+        errors.email = 'Email phải có tên người dùng trước @';
+        isValid = false;
+      } else if (formData.email.indexOf('.') <= formData.email.indexOf('@') + 1) {
+        errors.email = 'Email phải có tên domain hợp lệ sau @';
         isValid = false;
       }
       
@@ -165,8 +175,28 @@ const RegisterPage: React.FC = () => {
   };
   
   const handleNext = () => {
-    if (validateStep(activeStep)) {
+    // Only check if fields are filled when moving to next step
+    // We don't want to show validation errors immediately
+    const hasErrors = Object.values(formData).some(
+      (value, index) => 
+        // Only check fields relevant for current step
+        (activeStep === 0 && index < 3 && (value === '' || value === false))
+    );
+    
+    if (!hasErrors) {
+      // Clear any validation errors when moving to next step
+      setValidationErrors({
+        fullName: '',
+        email: '',
+        phone: '',
+        password: '',
+        confirmPassword: '',
+        acceptTerms: ''
+      });
       setActiveStep((prevStep) => prevStep + 1);
+    } else {
+      // Only validate and show errors if user attempts to proceed with empty fields
+      validateStep(activeStep);
     }
   };
   
@@ -196,13 +226,72 @@ const RegisterPage: React.FC = () => {
       };
       
       // Call register from auth context
-      await register(userData);
+      const response = await register(userData);
+      
+      if (!response.success) {
+        // Handle specific error messages and show them in appropriate fields
+        if (response.message.includes('Số điện thoại đã tồn tại')) {
+          setValidationErrors({
+            ...validationErrors,
+            phone: 'Số điện thoại này đã được sử dụng trong hệ thống'
+          });
+          setActiveStep(0); // Go back to personal info step
+        } else if (response.message.includes('Email đã tồn tại')) {
+          setValidationErrors({
+            ...validationErrors,
+            email: 'Email này đã được sử dụng'
+          });
+          setActiveStep(0); // Go back to personal info step
+        } else if (response.message.includes('Username đã tồn tại')) {
+          setValidationErrors({
+            ...validationErrors,
+            email: 'Email này đã được sử dụng làm tên đăng nhập'
+          });
+          setActiveStep(0); // Go back to personal info step
+        }
+        
+        // Display the error message from server at the top of the form
+        setError(response.message || 'Đăng ký thất bại. Vui lòng thử lại.');
+        setLoading(false);
+        return;
+      }
       
       // Chuyển hướng đến trang đăng nhập sau khi đăng ký thành công
       navigate('/login');
     } catch (err: any) {
       console.error('Registration error:', err);
-      setError(err.message || 'Đăng ký thất bại. Vui lòng thử lại.');
+      
+      // Try to extract message from error response
+      let errorMessage = 'Đăng ký thất bại. Vui lòng thử lại.';
+      
+      if (err.response) {
+        if (err.response.data && err.response.data.message) {
+          errorMessage = err.response.data.message;
+          
+          // Handle specific error messages from server
+          if (errorMessage.includes('Số điện thoại đã tồn tại')) {
+            setValidationErrors({
+              ...validationErrors,
+              phone: 'Số điện thoại này đã được sử dụng trong hệ thống'
+            });
+            setActiveStep(0); // Go back to personal info step
+          } else if (errorMessage.includes('Email đã tồn tại')) {
+            setValidationErrors({
+              ...validationErrors,
+              email: 'Email này đã được sử dụng'
+            });
+            setActiveStep(0); // Go back to personal info step
+          } else if (errorMessage.includes('Username đã tồn tại')) {
+            setValidationErrors({
+              ...validationErrors,
+              email: 'Email này đã được sử dụng làm tên đăng nhập'
+            });
+            setActiveStep(0); // Go back to personal info step
+          }
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -240,7 +329,7 @@ const RegisterPage: React.FC = () => {
               value={formData.email}
               onChange={handleChange}
               error={!!validationErrors.email}
-              helperText={validationErrors.email}
+              helperText={validationErrors.email || 'Email sẽ được dùng làm tên đăng nhập và không thể thay đổi sau này'}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -248,6 +337,7 @@ const RegisterPage: React.FC = () => {
                   </InputAdornment>
                 ),
               }}
+              required
             />
             
             <TextField
@@ -402,9 +492,11 @@ const RegisterPage: React.FC = () => {
           </Stepper>
           
           {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
+            <ErrorAlert 
+              error={error} 
+              onClose={() => setError(null)}
+              severity="error" 
+            />
           )}
           
           <Box component="form" onSubmit={handleSubmit}>

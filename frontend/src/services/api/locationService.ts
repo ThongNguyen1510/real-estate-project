@@ -395,11 +395,10 @@ export const getDistricts = getDistrictsByCity;
 export const getWards = getWardsByDistrict;
 
 // Tìm kiếm địa điểm
-export const searchLocations = async (keyword: string) => {
+export const searchLocations = async (keyword: string): Promise<LocationResponse> => {
   try {
-    const response = await axios.get(`${API_URL}/locations/search`, {
-      params: { keyword }
-    });
+    const timestamp = new Date().getTime();
+    const response = await axios.get(`${API_URL}/locations/search?q=${encodeURIComponent(keyword)}&_t=${timestamp}`);
     return response.data;
   } catch (error: unknown) {
     if (error instanceof Error && 'response' in error && error.response) {
@@ -443,7 +442,62 @@ export const getLocationNames = async (
       return { success: false, message: 'No location IDs provided' };
     }
     
-    // Build query string
+    // Try to get from provinces API first
+    try {
+      let cityName = '';
+      let districtName = '';
+      let wardName = '';
+      
+      // Get city name if cityId exists
+      if (cityId) {
+        const provinceCode = parseInt(cityId);
+        if (!isNaN(provinceCode)) {
+          const provinceResponse = await axios.get(`${PROVINCES_API_URL}/p/${provinceCode}`);
+          if (provinceResponse.data) {
+            cityName = provinceResponse.data.name;
+          }
+        }
+      }
+      
+      // Get district name if districtId exists
+      if (districtId) {
+        const districtCode = parseInt(districtId);
+        if (!isNaN(districtCode)) {
+          const districtResponse = await axios.get(`${PROVINCES_API_URL}/d/${districtCode}`);
+          if (districtResponse.data) {
+            districtName = districtResponse.data.name;
+          }
+        }
+      }
+      
+      // Get ward name if wardId exists
+      if (wardId) {
+        const wardCode = parseInt(wardId);
+        if (!isNaN(wardCode)) {
+          const wardResponse = await axios.get(`${PROVINCES_API_URL}/w/${wardCode}`);
+          if (wardResponse.data) {
+            wardName = wardResponse.data.name;
+          }
+        }
+      }
+      
+      // If we got names from the provinces API
+      if (cityName || districtName || wardName) {
+        return {
+          success: true,
+          data: {
+            city_name: cityName || cityId || '',
+            district_name: districtName || districtId || '',
+            ward_name: wardName || wardId || ''
+          }
+        };
+      }
+    } catch (openApiError) {
+      console.error('Error getting location names from provinces API:', openApiError);
+      // Continue with local API if provinces API failed
+    }
+    
+    // Build query string for local API
     const queryString = new URLSearchParams(params).toString();
     
     // Add timestamp to prevent caching

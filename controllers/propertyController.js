@@ -1192,7 +1192,10 @@ async function searchProperties(req, res) {
       
       // Pagination
       page = 1,
-      limit = 10
+      limit = 10,
+
+      // Special params
+      include_expired = 'false'
     } = req.query;
 
     // ===== KIỂM TRA BẤT THƯỜNG =====
@@ -1403,6 +1406,13 @@ async function searchProperties(req, res) {
       whereClause += ' AND p.status = @default_status';
       request.input('default_status', sql.NVarChar, 'available');
       console.log('Lọc mặc định: chỉ BĐS có trạng thái available');
+    }
+
+    // Filter out expired properties unless explicitly requested
+    if (include_expired !== 'true') {
+      whereClause += ' AND (p.expires_at IS NULL OR p.expires_at > @currentDate)';
+      request.input('currentDate', sql.DateTime, new Date());
+      console.log('Lọc: loại bỏ tin đã hết hạn');
     }
 
     // Amenities filter (multiple values possible)

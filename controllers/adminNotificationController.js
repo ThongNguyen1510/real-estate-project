@@ -121,7 +121,8 @@ const createAdminNotification = async (req, res) => {
             target_users,
             is_active, 
             start_date, 
-            end_date 
+            end_date,
+            is_featured 
         } = req.body;
         
         // Validate input
@@ -160,6 +161,7 @@ const createAdminNotification = async (req, res) => {
         request.input('start_date', sql.DateTime, start_date || new Date());
         request.input('end_date', sql.DateTime, end_date || null);
         request.input('created_by', sql.Int, req.user.id);
+        request.input('is_featured', sql.Bit, is_featured === true ? 1 : 0);
         
         const result = await request.query(`
             INSERT INTO AdminNotifications (
@@ -171,6 +173,7 @@ const createAdminNotification = async (req, res) => {
                 start_date,
                 end_date,
                 created_by,
+                is_featured,
                 created_at
             )
             VALUES (
@@ -182,6 +185,7 @@ const createAdminNotification = async (req, res) => {
                 @start_date,
                 @end_date,
                 @created_by,
+                @is_featured,
                 GETDATE()
             );
             
@@ -253,7 +257,8 @@ const updateAdminNotification = async (req, res) => {
             target_users,
             is_active, 
             start_date, 
-            end_date 
+            end_date,
+            is_featured 
         } = req.body;
         
         // Validate target_type nếu được cung cấp
@@ -292,6 +297,7 @@ const updateAdminNotification = async (req, res) => {
         request.input('is_active', sql.Bit, is_active !== undefined ? (is_active ? 1 : 0) : existingNotification.is_active);
         request.input('start_date', sql.DateTime, start_date || existingNotification.start_date);
         request.input('end_date', sql.DateTime, end_date !== undefined ? end_date : existingNotification.end_date);
+        request.input('is_featured', sql.Bit, is_featured !== undefined ? (is_featured ? 1 : 0) : existingNotification.is_featured);
         
         await request.query(`
             UPDATE AdminNotifications
@@ -303,6 +309,7 @@ const updateAdminNotification = async (req, res) => {
                 is_active = @is_active,
                 start_date = @start_date,
                 end_date = @end_date,
+                is_featured = @is_featured,
                 updated_at = GETDATE()
             WHERE id = @id
         `);
@@ -319,6 +326,7 @@ const updateAdminNotification = async (req, res) => {
                 is_active: is_active !== undefined ? is_active : Boolean(existingNotification.is_active),
                 start_date: start_date || existingNotification.start_date,
                 end_date: end_date !== undefined ? end_date : existingNotification.end_date,
+                is_featured: is_featured !== undefined ? is_featured : Boolean(existingNotification.is_featured),
                 updated_at: new Date().toISOString()
             }
         });
@@ -412,11 +420,81 @@ const sendAdminNotification = async (req, res) => {
     }
 };
 
+// Chuyển đổi trạng thái nổi bật của thông báo
+const toggleFeatureStatus = async (req, res) => {
+    try {
+        // Kiểm tra quyền admin
+        if (!req.user.is_admin) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền truy cập tính năng này'
+            });
+        }
+
+        const notificationId = req.params.id;
+        const { is_featured } = req.body;
+
+        if (is_featured === undefined) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vui lòng cung cấp trạng thái nổi bật (is_featured)'
+            });
+        }
+
+        const request = new sql.Request();
+        request.input('id', sql.Int, notificationId);
+        request.input('is_featured', sql.Bit, is_featured ? 1 : 0);
+
+        // Kiểm tra xem thông báo có tồn tại không
+        const checkResult = await request.query(`
+            SELECT id FROM AdminNotifications WHERE id = @id
+        `);
+
+        if (checkResult.recordset.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy thông báo'
+            });
+        }
+
+        // Cập nhật trạng thái nổi bật
+        await request.query(`
+            UPDATE AdminNotifications
+            SET is_featured = @is_featured
+            WHERE id = @id
+        `);
+
+        // Nếu đặt thông báo này là nổi bật, hãy hủy nổi bật các thông báo khác
+        if (is_featured) {
+            await request.query(`
+                UPDATE AdminNotifications
+                SET is_featured = 0
+                WHERE id != @id
+            `);
+        }
+
+        res.status(200).json({
+            success: true,
+            message: is_featured 
+                ? 'Đã đặt thông báo này là thông báo nổi bật' 
+                : 'Đã hủy trạng thái nổi bật của thông báo'
+        });
+    } catch (error) {
+        console.error('Error toggling feature status:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Đã xảy ra lỗi khi thay đổi trạng thái nổi bật của thông báo',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     getAdminNotifications,
     getAdminNotification,
     createAdminNotification,
     updateAdminNotification,
     deleteAdminNotification,
-    sendAdminNotification
+    sendAdminNotification,
+    toggleFeatureStatus
 }; 

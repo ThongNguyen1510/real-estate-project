@@ -312,29 +312,30 @@ export const uploadImages = async (propertyId: string, formData: FormData) => {
   }
 };
 
-// Thêm/xóa bất động sản vào/khỏi yêu thích
-export const toggleFavorite = async (propertyId: number | string) => {
+// Toggle favorite property
+export const toggleFavorite = async (propertyId: string | number) => {
   try {
-    // First check if this property is currently favorited 
-    // If needed, we would implement a check endpoint here
-    
-    // Toggle endpoint handles both add and remove
-    const response = await axios.post(`${API_URL}/properties/${propertyId}/favorite`, null, {
+    const token = getAccessToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const config = {
       headers: {
-        Authorization: `Bearer ${getAccessToken()}`
+        'Authorization': `Bearer ${token}`
       }
-    });
-    
-    // Log response for debugging
-    console.log(`Toggle favorite for property ${propertyId}:`, response.data);
+    };
+
+    const response = await axios.post(
+      `${API_URL}/properties/${propertyId}/favorite`, 
+      {}, // Empty body
+      config
+    );
     
     return response.data;
-  } catch (error: any) {
-    console.error(`Error toggling favorite for property ${propertyId}:`, error);
-    if (error.response) {
-      return error.response.data;
-    }
-    return { success: false, message: error.message };
+  } catch (error) {
+    console.error('Error toggling property favorite status:', error);
+    throw error;
   }
 };
 

@@ -62,10 +62,15 @@ export const register = async (data: RegisterData) => {
     
     return response.data;
   } catch (error: any) {
-    if (error.response) {
+    console.log('Registration error:', error.response?.data || error.message);
+    
+    // Return the error response directly instead of wrapping it
+    if (error.response && error.response.data) {
       return error.response.data;
     }
-    return { success: false, message: error.message };
+    
+    // Only if there's no error.response.data, create our own error structure
+    return { success: false, message: error.message || 'Đăng ký thất bại, vui lòng thử lại sau' };
   }
 };
 

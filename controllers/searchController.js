@@ -19,7 +19,8 @@ const searchByMap = async (req, res) => {
             sort_by = 'created_at',
             sort_order = 'desc',
             page = 1,
-            limit = 10
+            limit = 10,
+            include_expired = 'false'
         } = req.query;
 
         if (!lat || !lng) {
@@ -50,11 +51,19 @@ const searchByMap = async (req, res) => {
                 sin(radians(${lat})) * 
                 sin(radians(CAST(p.latitude AS FLOAT)))
             )) <= ${radius}
+            AND p.status = 'available'
         `;
 
         // Thêm các điều kiện lọc
         const conditions = [];
         const params = [];
+        
+        // Filter out expired properties unless explicitly requested
+        if (include_expired !== 'true') {
+            conditions.push('(p.expires_at IS NULL OR p.expires_at > @currentDate)');
+            params.push({ name: 'currentDate', value: new Date() });
+            console.log('Filtering out expired properties');
+        }
 
         if (price_min) {
             conditions.push('p.price >= @price_min');
@@ -158,6 +167,7 @@ const searchByMap = async (req, res) => {
                 sin(radians(${lat})) * 
                 sin(radians(CAST(p.latitude AS FLOAT)))
             )) <= ${radius}
+            AND p.status = 'available'
             ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
         `;
 
@@ -204,7 +214,8 @@ const searchByArea = async (req, res) => {
             sort_by = 'created_at',
             sort_order = 'desc',
             page = 1,
-            limit = 10
+            limit = 10,
+            include_expired = 'false'
         } = req.query;
 
         if (!province && !city && !city_name) {
@@ -232,10 +243,17 @@ const searchByArea = async (req, res) => {
                 l.city, l.district, l.ward, l.city_name, l.district_name, l.ward_name
             FROM Properties p
             LEFT JOIN Locations l ON p.location_id = l.id
-            WHERE 1=1
+            WHERE p.status = 'available'
         `;
 
         const params = [];
+
+        // Filter out expired properties unless explicitly requested
+        if (include_expired !== 'true') {
+            query += ' AND (p.expires_at IS NULL OR p.expires_at > @currentDate)';
+            params.push({ name: 'currentDate', value: new Date() });
+            console.log('Filtering out expired properties');
+        }
 
         // Chuyển đổi city ID: 1 = Hà Nội, 79 = TP.HCM
         // Các ID khác cần map tương ứng nếu cần
@@ -385,9 +403,14 @@ const searchByArea = async (req, res) => {
             SELECT COUNT(*) as total
             FROM Properties p
             LEFT JOIN Locations l ON p.location_id = l.id
-            WHERE 1=1
+            WHERE p.status = 'available'
         `;
 
+        // Filter out expired properties unless explicitly requested
+        if (include_expired !== 'true') {
+            countQuery += ' AND (p.expires_at IS NULL OR p.expires_at > @currentDate)';
+        }
+        
         // Áp dụng các điều kiện tương tự
         if (province || city || city_name || cityName) {
             let locationConditions = [];
@@ -476,7 +499,8 @@ const searchProperties = async (req, res) => {
         city,
         city_name,
         district,
-        ward
+        ward,
+        include_expired = 'false'
     } = req.query;
 
     // Debug log cho tham số city_name
@@ -550,6 +574,13 @@ const searchProperties = async (req, res) => {
         if (status) {
             query += ' AND p.status = @status';
             params.push({ name: 'status', value: status });
+        }
+        
+        // Filter out expired properties unless explicitly requested
+        if (include_expired !== 'true') {
+            query += ' AND (p.expires_at IS NULL OR p.expires_at > @currentDate)';
+            params.push({ name: 'currentDate', value: new Date() });
+            console.log('Filtering out expired properties');
         }
         
         // Thêm điều kiện tìm kiếm theo tỉnh/thành phố (hỗ trợ cả ID và tên)

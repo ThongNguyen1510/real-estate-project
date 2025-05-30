@@ -17,6 +17,7 @@ const notificationModel = {
                     notification_type,
                     reference_id,
                     is_read,
+                    is_featured,
                     created_at
                 FROM Notifications
                 WHERE user_id = @userId
@@ -104,6 +105,7 @@ const notificationModel = {
             request.input('message', sql.NVarChar, notificationData.message);
             request.input('notification_type', sql.NVarChar, notificationData.notification_type);
             request.input('reference_id', sql.Int, notificationData.reference_id || null);
+            request.input('is_featured', sql.Bit, notificationData.is_featured || false);
             
             const result = await request.query(`
                 INSERT INTO Notifications (
@@ -113,6 +115,7 @@ const notificationModel = {
                     notification_type,
                     reference_id,
                     is_read,
+                    is_featured,
                     created_at
                 )
                 VALUES (
@@ -122,6 +125,7 @@ const notificationModel = {
                     @notification_type,
                     @reference_id,
                     0,
+                    @is_featured,
                     GETDATE()
                 );
                 
@@ -161,7 +165,8 @@ const notificationModel = {
                 title: adminNotification.title,
                 message: adminNotification.message,
                 notification_type: 'admin',
-                reference_id: adminNotification.id
+                reference_id: adminNotification.id,
+                is_featured: adminNotification.is_featured || false
             };
             
             return await this.createNotification(notificationData);
@@ -339,6 +344,95 @@ const notificationModel = {
             return true;
         } catch (error) {
             console.error('Error updating notification settings:', error);
+            throw error;
+        }
+    },
+    
+    // Tạo thông báo về tin đăng sắp hết hạn
+    async createPropertyExpiringNotification(property) {
+        try {
+            const notificationData = {
+                user_id: property.owner_id,
+                title: 'Tin đăng sắp hết hạn',
+                message: `Tin đăng "${property.title}" của bạn sẽ hết hạn trong 3 ngày nữa. Hãy gia hạn để tin tiếp tục hiển thị trên trang chủ.`,
+                notification_type: 'property_expiring_soon',
+                reference_id: property.id
+            };
+            
+            return await this.createNotification(notificationData);
+        } catch (error) {
+            console.error('Error creating property expiring soon notification:', error);
+            throw error;
+        }
+    },
+    
+    // Tạo thông báo về báo cáo được chấp nhận
+    async createReportApprovedNotification(reportData) {
+        try {
+            const notificationData = {
+                user_id: reportData.reporter_id,
+                title: 'Báo cáo đã được chấp nhận',
+                message: `Báo cáo của bạn về "${reportData.property_title}" đã được quản trị viên chấp nhận. Cảm ơn bạn đã góp phần xây dựng cộng đồng tốt đẹp hơn.`,
+                notification_type: 'report_approved',
+                reference_id: reportData.id
+            };
+            
+            return await this.createNotification(notificationData);
+        } catch (error) {
+            console.error('Error creating report approved notification:', error);
+            throw error;
+        }
+    },
+    
+    // Tạo thông báo về báo cáo bị từ chối
+    async createReportRejectedNotification(reportData) {
+        try {
+            const notificationData = {
+                user_id: reportData.reporter_id,
+                title: 'Báo cáo đã bị từ chối',
+                message: `Báo cáo của bạn về "${reportData.property_title}" đã bị từ chối bởi quản trị viên. Vui lòng xem lại nội dung báo cáo.`,
+                notification_type: 'report_rejected',
+                reference_id: reportData.id
+            };
+            
+            return await this.createNotification(notificationData);
+        } catch (error) {
+            console.error('Error creating report rejected notification:', error);
+            throw error;
+        }
+    },
+    
+    // Tạo thông báo về tin đăng được yêu thích
+    async createPropertyFavoritedNotification(propertyId, userId, favoriterName) {
+        try {
+            // Lấy thông tin tin đăng trước
+            const request = new sql.Request();
+            request.input('propertyId', sql.Int, propertyId);
+            
+            const propertyResult = await request.query(`
+                SELECT id, title, owner_id 
+                FROM Properties 
+                WHERE id = @propertyId
+            `);
+            
+            if (propertyResult.recordset.length === 0) {
+                throw new Error('Property not found');
+            }
+            
+            const property = propertyResult.recordset[0];
+            
+            // Tạo thông báo cho chủ tin đăng
+            const notificationData = {
+                user_id: property.owner_id,
+                title: 'Tin đăng được yêu thích',
+                message: `"${favoriterName}" đã thêm tin đăng "${property.title}" vào danh sách yêu thích.`,
+                notification_type: 'property_favorited',
+                reference_id: propertyId
+            };
+            
+            return await this.createNotification(notificationData);
+        } catch (error) {
+            console.error('Error creating property favorited notification:', error);
             throw error;
         }
     }

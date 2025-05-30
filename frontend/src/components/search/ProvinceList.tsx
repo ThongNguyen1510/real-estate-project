@@ -8,14 +8,18 @@ import {
   Paper, 
   Link,
   useTheme,
-  Divider
+  Divider,
+  CircularProgress
 } from '@mui/material';
-import { locationService } from '../../services/api';
+import { fetchAllProvinces, Province, formatLocationCode } from '../../utils/locationUtils';
 import { getImageUrl } from '../../utils/imageUtils';
 
-interface Province {
+interface ProvinceData {
   id: string;
   name: string;
+  image?: string;
+  listings?: string;
+  size?: number;
 }
 
 interface ProvinceListProps {
@@ -34,46 +38,38 @@ const POPULAR_PROVINCES = [
 const ProvinceList: React.FC<ProvinceListProps> = ({ onProvinceSelected }) => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [provinces, setProvinces] = useState<ProvinceData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProvinces = async () => {
       try {
         setLoading(true);
-        const response = await locationService.getCities();
+        setError(null);
         
-        if (response.success && Array.isArray(response.data)) {
-          // Sort provinces alphabetically
-          const sortedProvinces = [...response.data].sort((a, b) => 
+        // Fetch provinces from the Vietnam Provinces API
+        const provincesData = await fetchAllProvinces();
+        
+        if (provincesData && Array.isArray(provincesData)) {
+          // Convert to our component's expected format
+          const formattedProvinces = provincesData.map((province: Province) => ({
+            id: formatLocationCode(province.code),
+            name: province.name
+          }));
+          
+          // Sort alphabetically
+          const sortedProvinces = [...formattedProvinces].sort((a, b) => 
             a.name.localeCompare(b.name, 'vi')
           );
+          
           setProvinces(sortedProvinces);
-        } else {
-          console.error('Failed to fetch provinces:', response);
-          // Fallback to mock data if API fails
-          setProvinces([
-            { id: '1', name: 'Hà Nội' },
-            { id: '79', name: 'Hồ Chí Minh' },
-            { id: '48', name: 'Đà Nẵng' },
-            { id: '92', name: 'Cần Thơ' },
-            { id: '31', name: 'Hải Phòng' },
-            { id: '56', name: 'Khánh Hòa' },
-            { id: '75', name: 'Bình Dương' },
-            { id: '77', name: 'Đồng Nai' },
-            { id: '74', name: 'Bình Phước' },
-            { id: '70', name: 'Tây Ninh' },
-            { id: '72', name: 'Long An' },
-            { id: '86', name: 'Vĩnh Long' },
-            { id: '87', name: 'Kiên Giang' },
-            { id: '83', name: 'Bến Tre' },
-            { id: '82', name: 'Tiền Giang' },
-            { id: '80', name: 'Bà Rịa - Vũng Tàu' }
-          ]);
+          setLoading(false);
         }
       } catch (error) {
         console.error('Error fetching provinces:', error);
-        // Fallback to mock data if API fails
+        setError('Không thể tải danh sách tỉnh thành. Vui lòng thử lại sau.');
+        // Use fallback data if API fails
         setProvinces([
           { id: '1', name: 'Hà Nội' },
           { id: '79', name: 'Hồ Chí Minh' },
@@ -101,23 +97,16 @@ const ProvinceList: React.FC<ProvinceListProps> = ({ onProvinceSelected }) => {
   }, []);
 
   const handleProvinceClick = (provinceId: string, provinceName: string) => {
-    // Normalize Hà Nội code
-    const normalizedId = provinceId === '01' ? '1' : provinceId;
-    
-    console.log(`ProvinceList: selected province ${provinceName} with id=${provinceId}, normalized to ${normalizedId}`);
+    console.log(`ProvinceList: selected province ${provinceName} with id=${provinceId}`);
     
     if (onProvinceSelected) {
-      onProvinceSelected(normalizedId, provinceName);
+      onProvinceSelected(provinceId, provinceName);
     } else {
-      // Chỉ sử dụng city ID và không sử dụng city_name để tránh xung đột
+      // Use only city ID to avoid conflicts
       const searchParams = new URLSearchParams();
-      searchParams.set('city', normalizedId);
-      // Bỏ tham số city_name khỏi URL để tránh xung đột với backend
-      // searchParams.set('city_name', provinceName);
+      searchParams.set('city', provinceId);
       
-      // Log để debug
-      console.log(`Redirecting to search with city=${normalizedId}`);
-      
+      console.log(`Redirecting to search with city=${provinceId}`);
       navigate(`/tim-kiem?${searchParams.toString()}`);
     }
   };
@@ -254,18 +243,18 @@ const ProvinceList: React.FC<ProvinceListProps> = ({ onProvinceSelected }) => {
                           left: 0,
                           width: '100%',
                           height: '100%',
-                      '&::after': {
-                        content: '""',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
+                          '&::after': {
+                            content: '""',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
                             background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0.2) 100%)',
                             zIndex: 1
-                      }
-                    }}
-                  >
+                          }
+                        }}
+                      >
                         <img 
                           src={province.image} 
                           alt={province.name}
@@ -277,32 +266,32 @@ const ProvinceList: React.FC<ProvinceListProps> = ({ onProvinceSelected }) => {
                         />
                       </Box>
                       
-                    <Box 
-                      sx={{ 
-                        position: 'absolute', 
+                      <Box 
+                        sx={{ 
+                          position: 'absolute',
                           top: 0,
-                        left: 0, 
+                          left: 0,
                           padding: 2,
                           zIndex: 2,
-                        width: '100%',
+                          width: '100%',
                           height: '100%',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'flex-start'
-                      }}
-                    >
-                      <Typography 
-                          variant="h6" 
-                        component="h3"
-                        sx={{ 
-                          color: 'white', 
-                          fontWeight: 'bold',
-                            mb: 1,
-                          textShadow: '1px 1px 3px rgba(0,0,0,0.7)'
                         }}
                       >
-                        {province.name}
-                      </Typography>
+                        <Typography 
+                          variant="h6" 
+                          component="h3"
+                          sx={{ 
+                            color: 'white', 
+                            fontWeight: 'bold',
+                            mb: 0.5,
+                            textShadow: '1px 1px 3px rgba(0,0,0,0.7)'
+                          }}
+                        >
+                          {province.name}
+                        </Typography>
                         
                         <Typography 
                           variant="body2" 
@@ -313,17 +302,15 @@ const ProvinceList: React.FC<ProvinceListProps> = ({ onProvinceSelected }) => {
                         >
                           {province.listings}
                         </Typography>
-                  </Box>
-                </Paper>
-              </Grid>
-            ))}
+                      </Box>
+                    </Paper>
+                  </Grid>
+                ))}
               </Grid>
             </Grid>
           </Grid>
         </Box>
-
-        <Divider sx={{ mb: 4 }} />
-
+        
         {/* All Provinces Section */}
         <Box>
           <Typography 
@@ -335,28 +322,32 @@ const ProvinceList: React.FC<ProvinceListProps> = ({ onProvinceSelected }) => {
           >
             Tất cả tỉnh thành
           </Typography>
-
+          
           {loading ? (
-            <Box sx={{ p: 4, textAlign: 'center' }}>
-              <Typography>Đang tải danh sách tỉnh thành...</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
             </Box>
+          ) : error ? (
+            <Typography color="error" sx={{ textAlign: 'center', py: 4 }}>
+              {error}
+            </Typography>
           ) : (
             <Grid container spacing={2}>
               {provinces.map((province) => (
-                <Grid item xs={6} sm={4} md={3} key={province.id}>
+                <Grid item xs={6} sm={4} md={3} lg={2} key={province.id}>
                   <Link
                     component="button"
-                    variant="body1"
                     underline="hover"
-                    color="inherit"
                     onClick={() => handleProvinceClick(province.id, province.name)}
-                    sx={{ 
-                      display: 'block', 
+                    sx={{
+                      color: 'text.primary',
                       textAlign: 'left',
-                      py: 0.5,
-                      color: theme.palette.text.primary,
+                      display: 'block',
+                      width: '100%',
+                      py: 0.8,
+                      px: 0.5,
                       '&:hover': {
-                        color: theme.palette.primary.main
+                        color: 'primary.main'
                       }
                     }}
                   >

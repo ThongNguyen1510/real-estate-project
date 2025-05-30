@@ -192,7 +192,7 @@ const PropertyMapSearch: React.FC<PropertyMapSearchProps> = ({
 
   // Navigate to property detail page
   const handlePropertyClick = (propertyId: number) => {
-    navigate(`/properties/${propertyId}`);
+    navigate(`/bat-dong-san/${propertyId}`);
   };
 
   // Get icon based on property type

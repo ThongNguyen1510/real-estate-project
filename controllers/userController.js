@@ -9,15 +9,70 @@ const registerUser = async (req, res) => {
     const { username, name, email, password, phone } = req.body;
     
     try {
-        // Kiểm tra username đã tồn tại
+        // Validate email format
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email không hợp lệ. Vui lòng nhập đúng định dạng email.'
+            });
+        }
+
+        // Email validation for domain and length
+        if (email.length > 255) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email không được vượt quá 255 ký tự'
+            });
+        }
+
+        if (email.indexOf('@') <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email phải có tên người dùng trước @'
+            });
+        }
+
+        if (email.indexOf('.') <= email.indexOf('@') + 1) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email phải có tên domain hợp lệ sau @'
+            });
+        }
+        
+        // Kiểm tra username, email hoặc phone đã tồn tại
         const checkUser = await sql.query`
-            SELECT * FROM Users WHERE username = ${username} OR email = ${email}
+            SELECT * FROM Users 
+            WHERE username = ${username} 
+            OR email = ${email} 
+            OR phone = ${phone}
         `;
         
         if (checkUser.recordset.length > 0) {
+            // Kiểm tra cụ thể xem trùng field nào
+            const existingUser = checkUser.recordset[0];
+            if (existingUser.username === username) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Username đã tồn tại'
+                });
+            }
+            if (existingUser.email === email) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email đã tồn tại'
+                });
+            }
+            if (existingUser.phone === phone) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Số điện thoại đã tồn tại'
+                });
+            }
+            
             return res.status(400).json({
                 success: false,
-                message: 'Username hoặc email đã tồn tại'
+                message: 'Thông tin đăng ký đã tồn tại'
             });
         }
 
@@ -517,7 +572,7 @@ const getUserProperties = async (req, res) => {
         const query = `
             SELECT 
                 p.id, p.title, p.price, p.area, p.property_type, p.status, 
-                p.created_at, p.primary_image_url, p.images,
+                p.created_at, p.primary_image_url, p.images, p.expires_at,
                 l.address, l.district, l.city
             FROM 
                 Properties p
@@ -587,6 +642,7 @@ const getUserProperties = async (req, res) => {
                 district: property.district,
                 city: property.city,
                 created_at: property.created_at,
+                expires_at: property.expires_at,
                 images: imageUrls,
                 image_url: property.primary_image_url || (imageUrls.length > 0 ? imageUrls[0] : null)
             };

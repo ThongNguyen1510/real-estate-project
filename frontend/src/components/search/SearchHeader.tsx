@@ -416,18 +416,38 @@ const SearchHeader: React.FC<SearchHeaderProps> = ({
                 </FormControl>
               </Grid>
               
-                {/* Search button */}
+                {/* Search button and Map view button in same row */}
                 <Grid item xs={12} sm={12} md={variant === 'detailed' ? 2 : 12}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    size="medium"
-                    startIcon={<SearchIcon />}
-                    onClick={performSearch}
-                    sx={{ height: variant === 'detailed' ? '40px' : 'auto' }}
-                  >
-                    Tìm kiếm
-                  </Button>
+                  {variant === 'detailed' ? (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      size="medium"
+                      startIcon={<SearchIcon />}
+                      onClick={performSearch}
+                      sx={{ height: '40px' }}
+                    >
+                      Tìm kiếm
+                    </Button>
+                  ) : (
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        size="medium"
+                        startIcon={<SearchIcon />}
+                        onClick={performSearch}
+                        sx={{ 
+                          height: 'auto', 
+                          minWidth: '120px',
+                          flex: '0 0 auto'
+                        }}
+                      >
+                        Tìm kiếm
+                      </Button>
+                      <MapViewButton />
+                    </Box>
+                  )}
                 </Grid>
               </Grid>
               
@@ -670,18 +690,20 @@ const SearchHeader: React.FC<SearchHeaderProps> = ({
               )}
             </Paper>
           </Box>
-          
-          {/* Map view button outside the white box */}
-          <Box sx={{ 
-            position: 'absolute', 
-            top: variant === 'detailed' ? '98px' : '128px', 
-            right: variant === 'detailed' ? '180px' : '240px',
-            zIndex: 10 
-          }}>
-            <MapViewButton />
-          </Box>
         </Container>
       </Box>
+
+      {/* Map view button for detailed variant */}
+      {variant === 'detailed' && (
+        <Box sx={{ 
+          position: 'absolute', 
+          top: '98px',
+          right: '180px',
+          zIndex: 10 
+        }}>
+          <MapViewButton />
+        </Box>
+      )}
     </>
   );
 };

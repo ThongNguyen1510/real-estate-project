@@ -1,4 +1,5 @@
 const reportModel = require('../models/reportModel');
+const notificationController = require('../controllers/notificationController');
 
 /**
  * Báo cáo tin đăng
@@ -223,8 +224,34 @@ const updateReportStatus = async (req, res) => {
             });
         }
         
+        // Lấy thông tin báo cáo trước khi cập nhật
+        const reportData = await reportModel.getReportById(id);
+        if (!reportData) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy báo cáo'
+            });
+        }
+        
         // Cập nhật trạng thái
         await reportModel.updateReportStatus(id, { status, admin_response });
+        
+        // Gửi thông báo cho người báo cáo
+        if (status === 'resolved') {
+            // Báo cáo được chấp nhận
+            await notificationController.createReportApprovedNotification({
+                id: reportData.id,
+                property_title: reportData.property_title,
+                reporter_id: reportData.reporter_id
+            });
+        } else if (status === 'rejected') {
+            // Báo cáo bị từ chối
+            await notificationController.createReportRejectedNotification({
+                id: reportData.id,
+                property_title: reportData.property_title,
+                reporter_id: reportData.reporter_id
+            });
+        }
         
         res.json({
             success: true,

@@ -223,6 +223,66 @@ const createPropertyExpirationNotification = async (property) => {
     }
 };
 
+// Tạo thông báo về tin đăng sắp hết hạn
+const createPropertyExpiringNotification = async (property) => {
+    try {
+        // Kiểm tra xem người dùng có bật thông báo về tin đăng hết hạn không
+        const userSettings = await notificationModel.getNotificationSettings(property.owner_id);
+        
+        if (userSettings.property_expiration_notifications) {
+            await notificationModel.createPropertyExpiringNotification(property);
+            console.log(`Created expiring soon notification for property ${property.id}`);
+        }
+    } catch (error) {
+        console.error('Error creating property expiring soon notification:', error);
+    }
+};
+
+// Tạo thông báo về báo cáo được chấp nhận
+const createReportApprovedNotification = async (reportData) => {
+    try {
+        await notificationModel.createReportApprovedNotification(reportData);
+        console.log(`Created report approved notification for report ${reportData.id}`);
+    } catch (error) {
+        console.error('Error creating report approved notification:', error);
+    }
+};
+
+// Tạo thông báo về báo cáo bị từ chối
+const createReportRejectedNotification = async (reportData) => {
+    try {
+        await notificationModel.createReportRejectedNotification(reportData);
+        console.log(`Created report rejected notification for report ${reportData.id}`);
+    } catch (error) {
+        console.error('Error creating report rejected notification:', error);
+    }
+};
+
+// Tạo thông báo khi tin đăng được yêu thích
+const createPropertyFavoritedNotification = async (propertyId, userId) => {
+    try {
+        // Lấy tên người thích
+        const { sql } = require('../config/database');
+        const request = new sql.Request();
+        request.input('userId', sql.Int, userId);
+        
+        const userResult = await request.query(`
+            SELECT display_name FROM Users WHERE id = @userId
+        `);
+        
+        if (userResult.recordset.length === 0) {
+            throw new Error('User not found');
+        }
+        
+        const favoriterName = userResult.recordset[0].display_name || 'Người dùng';
+        
+        await notificationModel.createPropertyFavoritedNotification(propertyId, userId, favoriterName);
+        console.log(`Created property favorited notification for property ${propertyId}`);
+    } catch (error) {
+        console.error('Error creating property favorited notification:', error);
+    }
+};
+
 // Gửi thông báo từ admin đến người dùng theo tiêu chí
 const sendAdminNotificationToUsers = async (adminNotificationId) => {
     try {
@@ -289,6 +349,85 @@ const sendAdminNotificationToUsers = async (adminNotificationId) => {
     }
 };
 
+// Lấy thông báo được đánh dấu nổi bật
+const getFeaturedNotifications = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        // Lấy các thông báo nổi bật của người dùng
+        const { sql } = require('../config/database');
+        const result = await sql.query`
+            SELECT 
+                n.id,
+                n.user_id,
+                n.title,
+                n.message,
+                n.notification_type,
+                n.reference_id,
+                n.is_read,
+                n.is_featured,
+                n.created_at
+            FROM Notifications n
+            WHERE n.user_id = ${userId}
+            AND n.is_featured = 1
+            ORDER BY n.created_at DESC
+        `;
+        
+        res.status(200).json({
+            success: true,
+            data: result.recordset
+        });
+    } catch (error) {
+        console.error('Error getting featured notifications:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Đã xảy ra lỗi khi lấy thông báo nổi bật',
+            error: error.message
+        });
+    }
+};
+
+// Lấy thông báo nổi bật cho tất cả người dùng
+const getGlobalFeaturedNotification = async (req, res) => {
+    try {
+        // Lấy thông báo admin được đánh dấu là nổi bật và còn đang hoạt động
+        const { sql } = require('../config/database');
+        const result = await sql.query`
+            SELECT TOP 1
+                an.id,
+                an.title,
+                an.message,
+                an.created_at,
+                u.full_name as created_by_name
+            FROM AdminNotifications an
+            LEFT JOIN Users u ON an.created_by = u.id
+            WHERE an.is_active = 1
+            AND an.is_featured = 1
+            AND (an.end_date IS NULL OR an.end_date > GETDATE())
+            ORDER BY an.created_at DESC
+        `;
+        
+        if (result.recordset.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không có thông báo nổi bật nào'
+            });
+        }
+        
+        res.status(200).json({
+            success: true,
+            data: result.recordset[0]
+        });
+    } catch (error) {
+        console.error('Error getting global featured notification:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Đã xảy ra lỗi khi lấy thông báo nổi bật',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     getUserNotifications,
     getUnreadCount,
@@ -299,5 +438,11 @@ module.exports = {
     updateNotificationSettings,
     createNotification,
     createPropertyExpirationNotification,
-    sendAdminNotificationToUsers
+    createPropertyExpiringNotification,
+    createReportApprovedNotification,
+    createReportRejectedNotification,
+    createPropertyFavoritedNotification,
+    sendAdminNotificationToUsers,
+    getFeaturedNotifications,
+    getGlobalFeaturedNotification
 }; 
