@@ -30,7 +30,8 @@ import {
   Map as MapIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
-import NotificationMenu from './NotificationMenu';
+import NotificationMenu from '../notifications/NotificationMenu';
+import GlobalAnnouncement from '../notifications/GlobalAnnouncement';
 
 const Header: React.FC = () => {
   const theme = useTheme();
@@ -238,430 +239,435 @@ const Header: React.FC = () => {
   };
 
   return (
-    <AppBar position="sticky" color="default" elevation={1}>
-      <Container maxWidth="lg">
-        <Toolbar disableGutters sx={{ justifyContent: 'space-between', height: '64px' }}>
-          {/* Logo */}
-          <Typography
-            variant="h6"
-            component={Link}
-            to="/"
-            sx={{
-              fontWeight: 700,
-              color: 'primary.main',
-              textDecoration: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              height: '40px',
-              whiteSpace: 'nowrap',
-              lineHeight: 1,
-              minWidth: '160px'
-            }}
-          >
-            <HomeIcon sx={{ mr: 1 }} />
-            BĐS Việt Nam
-          </Typography>
-          
-          {/* Desktop Navigation */}
-          {!isMobile && (
-            <Box 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                height: '40px', 
-                justifyContent: 'center',
-                flexGrow: 1,
-                ml: -2
-              }}
-            >
-              {menuItems.map((item) => (
-                <Button
-                  key={item.path}
-                  component={item.onClick ? 'button' : Link}
-                  to={item.onClick ? undefined : item.path}
-                  onClick={item.onClick}
-                  sx={navButtonStyle}
-                  className={
-                    item.path.startsWith('#') 
-                      ? location.hash === item.path ? 'active' : ''
-                      : item.path.includes('listing_type=rent') && location.search.includes('listing_type=rent')
-                        ? 'active'
-                        : item.path.includes('listing_type=sale') && location.search.includes('listing_type=sale')
-                          ? 'active'
-                          : location.pathname === item.path ? 'active' : ''
-                  }
-                >
-                  {item.title}
-                </Button>
-              ))}
-            </Box>
-          )}
-          
-          {/* User Actions Area */}
-          {!isMobile && (
-            <Box 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
+    <>
+      <AppBar position="sticky" color="default" elevation={1}>
+        <Container maxWidth="lg">
+          <Toolbar disableGutters sx={{ justifyContent: 'space-between', height: '64px' }}>
+            {/* Logo */}
+            <Typography
+              variant="h6"
+              component={Link}
+              to="/"
+              sx={{
+                fontWeight: 700,
+                color: 'primary.main',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
                 height: '40px',
-                minWidth: '160px',
-                justifyContent: 'flex-end'
+                whiteSpace: 'nowrap',
+                lineHeight: 1,
+                minWidth: '160px'
               }}
             >
-              {/* Authenticated user controls */}
-              {isAuthenticated && user ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', height: '40px' }}>
-                  <IconButton 
-                    component={Link} 
-                    to="/user/favorites"
-                    color="primary"
-                    sx={{ ...iconButtonStyle, mr: 1 }}
+              <HomeIcon sx={{ mr: 1 }} />
+              BĐS Việt Nam
+            </Typography>
+            
+            {/* Desktop Navigation */}
+            {!isMobile && (
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  height: '40px', 
+                  justifyContent: 'center',
+                  flexGrow: 1,
+                  ml: -2
+                }}
+              >
+                {menuItems.map((item) => (
+                  <Button
+                    key={item.path}
+                    component={item.onClick ? 'button' : Link}
+                    to={item.onClick ? undefined : item.path}
+                    onClick={item.onClick}
+                    sx={navButtonStyle}
+                    className={
+                      item.path.startsWith('#') 
+                        ? location.hash === item.path ? 'active' : ''
+                        : item.path.includes('listing_type=rent') && location.search.includes('listing_type=rent')
+                          ? 'active'
+                          : item.path.includes('listing_type=sale') && location.search.includes('listing_type=sale')
+                            ? 'active'
+                            : location.pathname === item.path ? 'active' : ''
+                    }
                   >
-                    <Badge color="secondary">
-                      <FavoriteIcon />
-                    </Badge>
-                  </IconButton>
-                  
-                  <NotificationMenu />
-                  
-                  <IconButton
-                    onClick={handleUserMenuOpen}
-                    sx={{ ...iconButtonStyle, p: 0.5 }}
-                  >
-                    {renderAvatar()}
-                  </IconButton>
-                  
-                  <Menu
-                    anchorEl={userMenuAnchorEl}
-                    open={Boolean(userMenuAnchorEl)}
-                    onClose={handleUserMenuClose}
-                    anchorOrigin={{
-                      vertical: 'bottom',
-                      horizontal: 'right',
-                    }}
-                    transformOrigin={{
-                      vertical: 'top',
-                      horizontal: 'right',
-                    }}
-                    PaperProps={{
-                      sx: { 
-                        mt: 1.5, 
-                        width: 220, 
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                        overflow: 'visible',
-                        '&:before': {
-                          content: '""',
-                          display: 'block',
-                          position: 'absolute',
-                          top: 0,
-                          right: 14,
-                          width: 10,
-                          height: 10,
-                          bgcolor: 'background.paper',
-                          transform: 'translateY(-50%) rotate(45deg)',
-                          zIndex: 0,
-                        },
-                      }
-                    }}
-                  >
-                    <MenuItem 
-                      component={Link} 
-                      to="/ho-so" 
-                      onClick={handleUserMenuClose}
-                      sx={{ py: 1.2 }}
-                    >
-                      <PersonIcon sx={{ mr: 1.5, fontSize: 20, color: 'primary.main' }} /> 
-                      <Typography sx={{ lineHeight: 1 }}>Hồ sơ cá nhân</Typography>
-                    </MenuItem>
-                    <MenuItem 
-                      component={Link} 
-                      to="/user/my-properties" 
-                      onClick={handleUserMenuClose}
-                      sx={{ py: 1.2 }}
-                    >
-                      <HomeIcon sx={{ mr: 1.5, fontSize: 20, color: 'primary.main' }} /> 
-                      <Typography sx={{ lineHeight: 1 }}>Tin đã đăng</Typography>
-                    </MenuItem>
-                    <MenuItem 
-                      component={Link} 
-                      to="/user/favorites" 
-                      onClick={handleUserMenuClose}
-                      sx={{ py: 1.2 }}
-                    >
-                      <FavoriteIcon sx={{ mr: 1.5, fontSize: 20, color: 'primary.main' }} /> 
-                      <Typography sx={{ lineHeight: 1 }}>Bất động sản yêu thích</Typography>
-                    </MenuItem>
-                    
-                    {/* Admin Dashboard Link - Only visible for admin users */}
-                    {user?.role === 'admin' && (
-                      <MenuItem 
-                        component={Link} 
-                        to="/admin" 
-                        onClick={handleUserMenuClose}
-                        sx={{ py: 1.2 }}
-                      >
-                        <Box sx={{ color: 'error.main', display: 'flex', alignItems: 'center', width: '100%' }}>
-                          <DashboardIcon sx={{ mr: 1.5, fontSize: 20 }} /> 
-                          <Typography sx={{ lineHeight: 1 }}>Quản trị hệ thống</Typography>
-                        </Box>
-                      </MenuItem>
-                    )}
-                    
-                    <Divider sx={{ my: 1 }} />
-                    <MenuItem 
-                      onClick={handleLogout}
-                      sx={{ py: 1.2 }}
-                    >
-                      <Box sx={{ color: 'error.main', display: 'flex', alignItems: 'center' }}>
-                        <PersonIcon sx={{ mr: 1.5, fontSize: 20 }} /> 
-                        <Typography sx={{ lineHeight: 1 }}>Đăng xuất</Typography>
-                      </Box>
-                    </MenuItem>
-                  </Menu>
-                </Box>
-              ) : (
-                <Box sx={{ 
+                    {item.title}
+                  </Button>
+                ))}
+              </Box>
+            )}
+            
+            {/* User Actions Area */}
+            {!isMobile && (
+              <Box 
+                sx={{ 
                   display: 'flex', 
                   alignItems: 'center', 
                   height: '40px',
+                  minWidth: '160px',
                   justifyContent: 'flex-end'
-                }}>
-                  <IconButton 
-                    onClick={handleLoginClick}
-                    color="primary"
-                    sx={{ ...iconButtonStyle, mr: 1 }}
-                    title="Yêu thích - Đăng nhập để sử dụng"
-                  >
-                    <Badge color="secondary">
-                      <FavoriteIcon />
-                    </Badge>
-                  </IconButton>
-                  
-                  <Box sx={{ display: 'flex', alignItems: 'center', height: '40px' }}>
-                    <Button
-                      variant="outlined" 
-                      onClick={handleLoginClick}
-                      sx={{ 
-                        ...authButtonStyle,
-                        mr: 1
-                      }}
-                    >
-                      Đăng nhập
-                    </Button>
-                    <Button
-                      variant="contained" 
-                      onClick={handleRegisterClick}
-                      color="primary"
-                      sx={authButtonStyle}
-                    >
-                      Đăng ký
-                    </Button>
-                  </Box>
-                </Box>
-              )}
-            </Box>
-          )}
-          
-          {/* Mobile Navigation */}
-          {isMobile && (
-            <Box 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                height: '40px',
-                flexGrow: 1,
-                justifyContent: 'flex-end'
-              }}
-            >
-              {isAuthenticated && user ? (
-                <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', height: '40px' }}>
-                  <IconButton 
-                    component={Link} 
-                    to="/user/favorites"
-                    color="primary"
-                    sx={{ ...iconButtonStyle, p: 0.8 }}
-                  >
-                    <Badge color="secondary">
-                      <FavoriteIcon fontSize="small" />
-                    </Badge>
-                  </IconButton>
-                </Box>
-              ) : (
-                <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', height: '40px' }}>
-                  <IconButton 
-                    onClick={handleLoginClick}
-                    color="primary"
-                    sx={{ ...iconButtonStyle, p: 0.8 }}
-                    title="Yêu thích - Đăng nhập để sử dụng"
-                  >
-                    <Badge color="secondary">
-                      <FavoriteIcon fontSize="small" />
-                    </Badge>
-                  </IconButton>
-                </Box>
-              )}
-              
-              <IconButton
-                edge="end"
-                color="inherit"
-                aria-label="menu"
-                onClick={handleMobileMenuOpen}
-                sx={{ ...iconButtonStyle, p: 0.8 }}
-              >
-                <MenuIcon />
-              </IconButton>
-              
-              <Menu
-                anchorEl={mobileMenuAnchorEl}
-                open={Boolean(mobileMenuAnchorEl)}
-                onClose={handleMobileMenuClose}
-                PaperProps={{
-                  sx: { 
-                    width: 240,
-                    mt: 1,
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-                  }
                 }}
               >
-                {menuItems.map((item) => {
-                  // Common styling for menu items
-                  const menuItemSx = {
-                    py: 1.5, 
-                    lineHeight: 1, 
-                    whiteSpace: 'nowrap',
-                    borderLeft: (item.path.startsWith('#') ? location.hash === item.path : location.pathname === item.path) 
-                      ? '3px solid' 
-                      : '3px solid transparent',
-                    borderColor: (item.path.startsWith('#') ? location.hash === item.path : location.pathname === item.path) 
-                      ? 'primary.main' 
-                      : 'transparent',
-                    bgcolor: (item.path.startsWith('#') ? location.hash === item.path : location.pathname === item.path) 
-                      ? 'rgba(25, 118, 210, 0.08)' 
-                      : 'transparent',
-                    pl: (item.path.startsWith('#') ? location.hash === item.path : location.pathname === item.path) 
-                      ? 2 
-                      : 2.3,
-                    transition: 'all 0.2s ease'
-                  };
-
-                  // Menu item content (icon and text)
-                  const menuItemContent = (
-                    <>
-                      {React.isValidElement(item.icon) ? 
-                        React.cloneElement(item.icon, {
-                          ...(location.pathname === item.path ? {color: 'primary'} : {color: 'inherit'}) as any,
-                          sx: { fontSize: '1.2rem' }
-                        }) : 
-                        item.icon
-                      }
-                      <Typography 
-                        sx={{ 
-                          ml: 1.5, 
-                          lineHeight: 1,
-                          fontWeight: location.pathname === item.path ? 600 : 400,
-                          color: location.pathname === item.path ? 'primary.main' : 'inherit'
-                        }}
-                      >
-                        {item.title}
-                      </Typography>
-                    </>
-                  );
-                  
-                  // Return the appropriate MenuItem based on whether it has onClick or not
-                  return item.onClick ? (
-                    <MenuItem
-                      key={item.path}
-                      onClick={(e: React.MouseEvent<HTMLLIElement>) => {
-                        item.onClick && item.onClick(e);
-                        handleMobileMenuClose();
+                {/* Authenticated user controls */}
+                {isAuthenticated && user ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', height: '40px' }}>
+                    <IconButton 
+                      component={Link} 
+                      to="/user/favorites"
+                      color="primary"
+                      sx={{ ...iconButtonStyle, mr: 1 }}
+                    >
+                      <Badge color="secondary">
+                        <FavoriteIcon />
+                      </Badge>
+                    </IconButton>
+                    
+                    <NotificationMenu />
+                    
+                    <IconButton
+                      onClick={handleUserMenuOpen}
+                      sx={{ ...iconButtonStyle, p: 0.5 }}
+                    >
+                      {renderAvatar()}
+                    </IconButton>
+                    
+                    <Menu
+                      anchorEl={userMenuAnchorEl}
+                      open={Boolean(userMenuAnchorEl)}
+                      onClose={handleUserMenuClose}
+                      anchorOrigin={{
+                        vertical: 'bottom',
+                        horizontal: 'right',
                       }}
-                      sx={menuItemSx}
+                      transformOrigin={{
+                        vertical: 'top',
+                        horizontal: 'right',
+                      }}
+                      PaperProps={{
+                        sx: { 
+                          mt: 1.5, 
+                          width: 220, 
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                          overflow: 'visible',
+                          '&:before': {
+                            content: '""',
+                            display: 'block',
+                            position: 'absolute',
+                            top: 0,
+                            right: 14,
+                            width: 10,
+                            height: 10,
+                            bgcolor: 'background.paper',
+                            transform: 'translateY(-50%) rotate(45deg)',
+                            zIndex: 0,
+                          },
+                        }
+                      }}
                     >
-                      {menuItemContent}
-                    </MenuItem>
-                  ) : (
-                    <MenuItem
-                      key={item.path}
-                      component={Link}
-                      to={item.path}
-                      onClick={() => handleMobileMenuClose()}
-                      sx={menuItemSx}
-                    >
-                      {menuItemContent}
-                    </MenuItem>
-                  );
-                })}
-                
-                {/* Admin Dashboard Link in Mobile Menu - Only visible for admin users */}
-                {isAuthenticated && user?.role === 'admin' && (
-                  <MenuItem
-                    component={Link}
-                    to="/admin"
-                    onClick={handleMobileMenuClose}
-                    sx={{ 
-                      py: 1.5, 
-                      lineHeight: 1, 
-                      whiteSpace: 'nowrap',
-                      borderLeft: location.pathname === '/admin' ? '3px solid' : '3px solid transparent',
-                      borderColor: location.pathname === '/admin' ? 'error.main' : 'transparent',
-                      bgcolor: location.pathname === '/admin' ? 'rgba(211, 47, 47, 0.08)' : 'transparent',
-                      pl: location.pathname === '/admin' ? 2 : 2.3,
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <DashboardIcon
-                      color={location.pathname === '/admin' ? 'error' : 'inherit'}
-                      sx={{ fontSize: '1.2rem' }}
-                    />
-                    <Typography sx={{ ml: 2, color: 'error.main', fontWeight: 'medium' }}>Quản trị hệ thống</Typography>
-                  </MenuItem>
-                )}
-                
-                <Divider sx={{ my: 1 }} />
-                
-                <Box sx={{ borderTop: '1px solid', borderColor: 'divider', mt: 1 }}>
-                  {isAuthenticated && user ? (
-                    <>
-                      <MenuItem component={Link} to="/ho-so" onClick={handleMobileMenuClose}>
-                        <PersonIcon sx={{ mr: 1 }} /> 
+                      <MenuItem 
+                        component={Link} 
+                        to="/ho-so" 
+                        onClick={handleUserMenuClose}
+                        sx={{ py: 1.2 }}
+                      >
+                        <PersonIcon sx={{ mr: 1.5, fontSize: 20, color: 'primary.main' }} /> 
                         <Typography sx={{ lineHeight: 1 }}>Hồ sơ cá nhân</Typography>
                       </MenuItem>
-                      <MenuItem component={Link} to="/user/my-properties" onClick={handleMobileMenuClose}>
-                        <HomeIcon sx={{ mr: 1 }} /> 
+                      <MenuItem 
+                        component={Link} 
+                        to="/user/my-properties" 
+                        onClick={handleUserMenuClose}
+                        sx={{ py: 1.2 }}
+                      >
+                        <HomeIcon sx={{ mr: 1.5, fontSize: 20, color: 'primary.main' }} /> 
                         <Typography sx={{ lineHeight: 1 }}>Tin đã đăng</Typography>
                       </MenuItem>
-                      <MenuItem component={Link} to="/user/favorites" onClick={handleMobileMenuClose}>
-                        <FavoriteIcon sx={{ mr: 1 }} /> 
+                      <MenuItem 
+                        component={Link} 
+                        to="/user/favorites" 
+                        onClick={handleUserMenuClose}
+                        sx={{ py: 1.2 }}
+                      >
+                        <FavoriteIcon sx={{ mr: 1.5, fontSize: 20, color: 'primary.main' }} /> 
                         <Typography sx={{ lineHeight: 1 }}>Bất động sản yêu thích</Typography>
                       </MenuItem>
-                      <MenuItem onClick={handleLogout}>
+                      
+                      {/* Admin Dashboard Link - Only visible for admin users */}
+                      {user?.role === 'admin' && (
+                        <MenuItem 
+                          component={Link} 
+                          to="/admin" 
+                          onClick={handleUserMenuClose}
+                          sx={{ py: 1.2 }}
+                        >
+                          <Box sx={{ color: 'error.main', display: 'flex', alignItems: 'center', width: '100%' }}>
+                            <DashboardIcon sx={{ mr: 1.5, fontSize: 20 }} /> 
+                            <Typography sx={{ lineHeight: 1 }}>Quản trị hệ thống</Typography>
+                          </Box>
+                        </MenuItem>
+                      )}
+                      
+                      <Divider sx={{ my: 1 }} />
+                      <MenuItem 
+                        onClick={handleLogout}
+                        sx={{ py: 1.2 }}
+                      >
                         <Box sx={{ color: 'error.main', display: 'flex', alignItems: 'center' }}>
-                          <PersonIcon sx={{ mr: 1 }} /> 
+                          <PersonIcon sx={{ mr: 1.5, fontSize: 20 }} /> 
                           <Typography sx={{ lineHeight: 1 }}>Đăng xuất</Typography>
                         </Box>
                       </MenuItem>
-                    </>
-                  ) : (
-                    <>
-                      <MenuItem onClick={(e) => { handleMobileMenuClose(); handleLoginClick(); }}>
-                        <PersonIcon sx={{ mr: 1 }} /> 
-                        <Typography sx={{ lineHeight: 1 }}>Đăng nhập</Typography>
+                    </Menu>
+                  </Box>
+                ) : (
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    height: '40px',
+                    justifyContent: 'flex-end'
+                  }}>
+                    <IconButton 
+                      onClick={handleLoginClick}
+                      color="primary"
+                      sx={{ ...iconButtonStyle, mr: 1 }}
+                      title="Yêu thích - Đăng nhập để sử dụng"
+                    >
+                      <Badge color="secondary">
+                        <FavoriteIcon />
+                      </Badge>
+                    </IconButton>
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center', height: '40px' }}>
+                      <Button
+                        variant="outlined" 
+                        onClick={handleLoginClick}
+                        sx={{ 
+                          ...authButtonStyle,
+                          mr: 1
+                        }}
+                      >
+                        Đăng nhập
+                      </Button>
+                      <Button
+                        variant="contained" 
+                        onClick={handleRegisterClick}
+                        color="primary"
+                        sx={authButtonStyle}
+                      >
+                        Đăng ký
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+            )}
+            
+            {/* Mobile Navigation */}
+            {isMobile && (
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  height: '40px',
+                  flexGrow: 1,
+                  justifyContent: 'flex-end'
+                }}
+              >
+                {isAuthenticated && user ? (
+                  <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', height: '40px' }}>
+                    <IconButton 
+                      component={Link} 
+                      to="/user/favorites"
+                      color="primary"
+                      sx={{ ...iconButtonStyle, p: 0.8 }}
+                    >
+                      <Badge color="secondary">
+                        <FavoriteIcon fontSize="small" />
+                      </Badge>
+                    </IconButton>
+                  </Box>
+                ) : (
+                  <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', height: '40px' }}>
+                    <IconButton 
+                      onClick={handleLoginClick}
+                      color="primary"
+                      sx={{ ...iconButtonStyle, p: 0.8 }}
+                      title="Yêu thích - Đăng nhập để sử dụng"
+                    >
+                      <Badge color="secondary">
+                        <FavoriteIcon fontSize="small" />
+                      </Badge>
+                    </IconButton>
+                  </Box>
+                )}
+                
+                <IconButton
+                  edge="end"
+                  color="inherit"
+                  aria-label="menu"
+                  onClick={handleMobileMenuOpen}
+                  sx={{ ...iconButtonStyle, p: 0.8 }}
+                >
+                  <MenuIcon />
+                </IconButton>
+                
+                <Menu
+                  anchorEl={mobileMenuAnchorEl}
+                  open={Boolean(mobileMenuAnchorEl)}
+                  onClose={handleMobileMenuClose}
+                  PaperProps={{
+                    sx: { 
+                      width: 240,
+                      mt: 1,
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+                    }
+                  }}
+                >
+                  {menuItems.map((item) => {
+                    // Common styling for menu items
+                    const menuItemSx = {
+                      py: 1.5, 
+                      lineHeight: 1, 
+                      whiteSpace: 'nowrap',
+                      borderLeft: (item.path.startsWith('#') ? location.hash === item.path : location.pathname === item.path) 
+                        ? '3px solid' 
+                        : '3px solid transparent',
+                      borderColor: (item.path.startsWith('#') ? location.hash === item.path : location.pathname === item.path) 
+                        ? 'primary.main' 
+                        : 'transparent',
+                      bgcolor: (item.path.startsWith('#') ? location.hash === item.path : location.pathname === item.path) 
+                        ? 'rgba(25, 118, 210, 0.08)' 
+                        : 'transparent',
+                      pl: (item.path.startsWith('#') ? location.hash === item.path : location.pathname === item.path) 
+                        ? 2 
+                        : 2.3,
+                      transition: 'all 0.2s ease'
+                    };
+
+                    // Menu item content (icon and text)
+                    const menuItemContent = (
+                      <>
+                        {React.isValidElement(item.icon) ? 
+                          React.cloneElement(item.icon, {
+                            ...(location.pathname === item.path ? {color: 'primary'} : {color: 'inherit'}) as any,
+                            sx: { fontSize: '1.2rem' }
+                          }) : 
+                          item.icon
+                        }
+                        <Typography 
+                          sx={{ 
+                            ml: 1.5, 
+                            lineHeight: 1,
+                            fontWeight: location.pathname === item.path ? 600 : 400,
+                            color: location.pathname === item.path ? 'primary.main' : 'inherit'
+                          }}
+                        >
+                          {item.title}
+                        </Typography>
+                      </>
+                    );
+                    
+                    // Return the appropriate MenuItem based on whether it has onClick or not
+                    return item.onClick ? (
+                      <MenuItem
+                        key={item.path}
+                        onClick={(e: React.MouseEvent<HTMLLIElement>) => {
+                          item.onClick && item.onClick(e);
+                          handleMobileMenuClose();
+                        }}
+                        sx={menuItemSx}
+                      >
+                        {menuItemContent}
                       </MenuItem>
-                      <MenuItem onClick={(e) => { handleMobileMenuClose(); handleRegisterClick(); }}>
-                        <PersonIcon sx={{ mr: 1 }} /> 
-                        <Typography sx={{ lineHeight: 1 }}>Đăng ký</Typography>
+                    ) : (
+                      <MenuItem
+                        key={item.path}
+                        component={Link}
+                        to={item.path}
+                        onClick={() => handleMobileMenuClose()}
+                        sx={menuItemSx}
+                      >
+                        {menuItemContent}
                       </MenuItem>
-                    </>
+                    );
+                  })}
+                  
+                  {/* Admin Dashboard Link in Mobile Menu - Only visible for admin users */}
+                  {isAuthenticated && user?.role === 'admin' && (
+                    <MenuItem
+                      component={Link}
+                      to="/admin"
+                      onClick={handleMobileMenuClose}
+                      sx={{ 
+                        py: 1.5, 
+                        lineHeight: 1, 
+                        whiteSpace: 'nowrap',
+                        borderLeft: location.pathname === '/admin' ? '3px solid' : '3px solid transparent',
+                        borderColor: location.pathname === '/admin' ? 'error.main' : 'transparent',
+                        bgcolor: location.pathname === '/admin' ? 'rgba(211, 47, 47, 0.08)' : 'transparent',
+                        pl: location.pathname === '/admin' ? 2 : 2.3,
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <DashboardIcon
+                        color={location.pathname === '/admin' ? 'error' : 'inherit'}
+                        sx={{ fontSize: '1.2rem' }}
+                      />
+                      <Typography sx={{ ml: 2, color: 'error.main', fontWeight: 'medium' }}>Quản trị hệ thống</Typography>
+                    </MenuItem>
                   )}
-                </Box>
-              </Menu>
-            </Box>
-          )}
-        </Toolbar>
-      </Container>
-    </AppBar>
+                  
+                  <Divider sx={{ my: 1 }} />
+                  
+                  <Box sx={{ borderTop: '1px solid', borderColor: 'divider', mt: 1 }}>
+                    {isAuthenticated && user ? (
+                      <>
+                        <MenuItem component={Link} to="/ho-so" onClick={handleMobileMenuClose}>
+                          <PersonIcon sx={{ mr: 1 }} /> 
+                          <Typography sx={{ lineHeight: 1 }}>Hồ sơ cá nhân</Typography>
+                        </MenuItem>
+                        <MenuItem component={Link} to="/user/my-properties" onClick={handleMobileMenuClose}>
+                          <HomeIcon sx={{ mr: 1 }} /> 
+                          <Typography sx={{ lineHeight: 1 }}>Tin đã đăng</Typography>
+                        </MenuItem>
+                        <MenuItem component={Link} to="/user/favorites" onClick={handleMobileMenuClose}>
+                          <FavoriteIcon sx={{ mr: 1 }} /> 
+                          <Typography sx={{ lineHeight: 1 }}>Bất động sản yêu thích</Typography>
+                        </MenuItem>
+                        <MenuItem onClick={handleLogout}>
+                          <Box sx={{ color: 'error.main', display: 'flex', alignItems: 'center' }}>
+                            <PersonIcon sx={{ mr: 1 }} /> 
+                            <Typography sx={{ lineHeight: 1 }}>Đăng xuất</Typography>
+                          </Box>
+                        </MenuItem>
+                      </>
+                    ) : (
+                      <>
+                        <MenuItem onClick={(e) => { handleMobileMenuClose(); handleLoginClick(); }}>
+                          <PersonIcon sx={{ mr: 1 }} /> 
+                          <Typography sx={{ lineHeight: 1 }}>Đăng nhập</Typography>
+                        </MenuItem>
+                        <MenuItem onClick={(e) => { handleMobileMenuClose(); handleRegisterClick(); }}>
+                          <PersonIcon sx={{ mr: 1 }} /> 
+                          <Typography sx={{ lineHeight: 1 }}>Đăng ký</Typography>
+                        </MenuItem>
+                      </>
+                    )}
+                  </Box>
+                </Menu>
+              </Box>
+            )}
+          </Toolbar>
+        </Container>
+      </AppBar>
+      
+      {/* Global announcements from admin */}
+      <GlobalAnnouncement />
+    </>
   );
 };
 

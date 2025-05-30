@@ -8,6 +8,7 @@ import './styles/GlobalStyles.scss';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import ScrollToTop from './components/layout/ScrollToTop';
+import FeaturedNotification from './components/notifications/FeaturedNotification';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -34,6 +35,7 @@ import UsersPage from './pages/admin/UsersPage';
 import PropertiesPage from './pages/admin/PropertiesPage';
 import ReportsManagementPage from './pages/admin/ReportsManagementPage';
 import NewsManagementPage from './pages/admin/NewsManagementPage';
+import AdminNotificationsPage from './pages/admin/AdminNotificationsPage';
 import AdminLayout from './pages/admin/AdminLayout';
 
 // Context
@@ -74,6 +76,7 @@ const AppContent = () => {
   return (
     <>
       <Header />
+      {!isAdmin && <FeaturedNotification />}
       <main>
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -102,6 +105,7 @@ const AppContent = () => {
           <Route path="/admin/properties" element={isAuthenticated && isAdmin ? <PropertiesPage /> : <Navigate to="/login" state={{ from: '/admin/properties' }} />} />
           <Route path="/admin/reports" element={isAuthenticated && isAdmin ? <ReportsManagementPage /> : <Navigate to="/login" state={{ from: '/admin/reports' }} />} />
           <Route path="/admin/news" element={isAuthenticated && isAdmin ? <NewsManagementPage /> : <Navigate to="/login" state={{ from: '/admin/news' }} />} />
+          <Route path="/admin/notifications" element={isAuthenticated && isAdmin ? <AdminNotificationsPage /> : <Navigate to="/login" state={{ from: '/admin/notifications' }} />} />
           
           {/* Fallback route - 404 Not Found */}
           <Route path="*" element={<Navigate to="/" />} />

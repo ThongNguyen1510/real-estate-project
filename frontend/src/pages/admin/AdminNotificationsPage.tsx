@@ -36,7 +36,11 @@ import {
   Badge,
   Switch,
   FormControlLabel,
-  Tooltip
+  Tooltip,
+  Checkbox,
+  ListItemIcon,
+  ListItemText,
+  ListItemButton
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -47,7 +51,9 @@ import {
   Notifications as NotificationsIcon,
   Campaign as CampaignIcon,
   Groups as GroupsIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  Star as StarIcon,
+  StarBorder as StarBorderIcon
 } from '@mui/icons-material';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -64,6 +70,7 @@ interface AdminNotification {
   target_type: 'all_users' | 'property_owners' | 'specific_users';
   target_users: string | null;
   is_active: boolean;
+  is_featured: boolean;
   start_date: string;
   end_date: string | null;
   created_by: number;
@@ -78,6 +85,7 @@ type FormValues = {
   target_type: 'all_users' | 'property_owners' | 'specific_users';
   target_users: number[];
   is_active: boolean;
+  is_featured: boolean;
   start_date: string;
   end_date: string | null;
 };
@@ -88,6 +96,7 @@ const initialFormValues: FormValues = {
   target_type: 'all_users',
   target_users: [],
   is_active: true,
+  is_featured: false,
   start_date: new Date().toISOString(),
   end_date: null,
 };
@@ -214,6 +223,7 @@ const AdminNotificationsPage: React.FC = () => {
         target_type: notification.target_type,
         target_users: parsedTargetUsers,
         is_active: notification.is_active,
+        is_featured: notification.is_featured,
         start_date: notification.start_date,
         end_date: notification.end_date,
       });
@@ -235,7 +245,13 @@ const AdminNotificationsPage: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
     const { name, value } = e.target;
     if (name) {
-      setFormValues(prev => ({ ...prev, [name]: value }));
+      if (name === 'is_featured' || name === 'is_active') {
+        // Check if target is an HTMLInputElement with a checked property
+        const isChecked = 'checked' in e.target ? e.target.checked : false;
+        setFormValues(prev => ({ ...prev, [name]: Boolean(isChecked) }));
+      } else {
+        setFormValues(prev => ({ ...prev, [name]: value }));
+      }
       
       // Clear validation errors
       if (formErrors[name]) {
@@ -532,6 +548,27 @@ const AdminNotificationsPage: React.FC = () => {
     }
   };
 
+  const handleToggleFeature = async (notification: AdminNotification) => {
+    try {
+      const response = await axios.put(
+        `${API_URL}/api/admin/notifications/${notification.id}/feature`,
+        { is_featured: !notification.is_featured },
+        { headers: { Authorization: token } }
+      );
+      
+      if (response.data.success) {
+        showSnackbar(response.data.message, 'success');
+        // Refresh notifications list
+        fetchNotifications();
+      } else {
+        showSnackbar('Không thể thay đổi trạng thái nổi bật của thông báo', 'error');
+      }
+    } catch (error) {
+      console.error('Error toggling feature status:', error);
+      showSnackbar('Lỗi khi thay đổi trạng thái nổi bật của thông báo', 'error');
+    }
+  };
+
   return (
     <AdminLayout title="Quản lý thông báo">
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -699,6 +736,7 @@ const AdminNotificationsPage: React.FC = () => {
                   <TableCell>Trạng thái</TableCell>
                   <TableCell>Ngày bắt đầu</TableCell>
                   <TableCell>Ngày kết thúc</TableCell>
+                  <TableCell>Nổi bật</TableCell>
                   <TableCell>Thao tác</TableCell>
                 </TableRow>
               </TableHead>
@@ -717,6 +755,15 @@ const AdminNotificationsPage: React.FC = () => {
                     </TableCell>
                     <TableCell>{formatDate(notification.start_date)}</TableCell>
                     <TableCell>{formatDate(notification.end_date)}</TableCell>
+                    <TableCell align="center">
+                      <IconButton 
+                        color={notification.is_featured ? "primary" : "default"} 
+                        onClick={() => handleToggleFeature(notification)}
+                        title={notification.is_featured ? "Hủy nổi bật" : "Đặt làm nổi bật"}
+                      >
+                        {notification.is_featured ? <StarIcon /> : <StarBorderIcon />}
+                      </IconButton>
+                    </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         <IconButton
@@ -875,6 +922,18 @@ const AdminNotificationsPage: React.FC = () => {
                 <MenuItem value={'false'}>Vô hiệu hóa</MenuItem>
               </Select>
             </FormControl>
+            
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formValues.is_featured}
+                  onChange={handleInputChange}
+                  name="is_featured"
+                  color="primary"
+                />
+              }
+              label="Đánh dấu là thông báo nổi bật (hiển thị ở trang chủ)"
+            />
           </Stack>
         </DialogContent>
         

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Box, 
   Typography, 
@@ -12,7 +12,14 @@ import {
   Divider,
   Grid,
   TextField,
-  InputAdornment
+  InputAdornment,
+  CircularProgress,
+  Card,
+  CardMedia,
+  CardContent,
+  Tabs,
+  Tab,
+  useTheme
 } from '@mui/material';
 import { 
   LocationOn as LocationIcon,
@@ -20,70 +27,23 @@ import {
   KeyboardArrowDown as KeyboardArrowDownIcon,
   Search as SearchIcon
 } from '@mui/icons-material';
+import { fetchAllProvinces, formatLocationCode, Province, District } from '../../utils/locationUtils';
+import { getImageUrl } from '../../utils/imageUtils';
 
-// Cities data
-const CITIES = [
-  { id: '79', name: 'Hồ Chí Minh' },
-  { id: '1', name: 'Hà Nội' },
-  { id: '48', name: 'Đà Nẵng' },
-  { id: '92', name: 'Cần Thơ' },
-  { id: '31', name: 'Hải Phòng' },
-  { id: '56', name: 'Khánh Hòa' },
-  { id: '75', name: 'Bình Dương' },
-  { id: '77', name: 'Đồng Nai' },
-  { id: '74', name: 'Bình Phước' },
-  { id: '70', name: 'Tây Ninh' },
-  { id: '72', name: 'Long An' },
-  { id: '86', name: 'Vĩnh Long' },
-  { id: '87', name: 'Kiên Giang' },
-  { id: '83', name: 'Bến Tre' },
-  { id: '84', name: 'Trà Vinh' },
-  { id: '82', name: 'Tiền Giang' },
-  { id: '80', name: 'Bà Rịa - Vũng Tàu' },
-  { id: '52', name: 'Bình Định' },
-  { id: '54', name: 'Phú Yên' },
-  { id: '58', name: 'Ninh Thuận' },
-  { id: '60', name: 'Bình Thuận' },
-  { id: '62', name: 'Kon Tum' },
-  { id: '64', name: 'Gia Lai' }
-];
+// Define an interface for location data for consistency
+interface CityData {
+  id: string;
+  name: string;
+  division_type?: string;
+  districts?: DistrictData[];
+  image?: string;
+}
 
-// Districts data by city
-const DISTRICTS = {
-  '79': [ // Hồ Chí Minh
-    'Quận 1', 'Quận 2', 'Quận 3', 'Quận 4', 'Quận 5', 'Quận 6', 'Quận 7', 'Quận 8', 'Quận 9',
-    'Quận 10', 'Quận 11', 'Quận 12', 'Quận Bình Thạnh', 'Quận Tân Bình', 'Quận Gò Vấp', 'Quận Phú Nhuận',
-    'Quận Tân Phú', 'Quận Bình Tân', 'Quận Thủ Đức', 'Huyện Nhà Bè', 'Huyện Bình Chánh', 
-    'Huyện Củ Chi', 'Huyện Hóc Môn', 'Huyện Cần Giờ'
-  ],
-  '1': [ // Hà Nội
-    'Quận Ba Đình', 'Quận Hoàn Kiếm', 'Quận Hai Bà Trưng', 'Quận Đống Đa', 'Quận Tây Hồ',
-    'Quận Cầu Giấy', 'Quận Thanh Xuân', 'Quận Hoàng Mai', 'Quận Long Biên', 'Quận Nam Từ Liêm',
-    'Quận Bắc Từ Liêm', 'Quận Hà Đông', 'Huyện Sóc Sơn', 'Huyện Đông Anh', 'Huyện Gia Lâm',
-    'Huyện Thanh Trì', 'Huyện Thường Tín', 'Huyện Phú Xuyên', 'Thị xã Sơn Tây'
-  ],
-  '48': [ // Đà Nẵng
-    'Quận Hải Châu', 'Quận Thanh Khê', 'Quận Sơn Trà', 'Quận Ngũ Hành Sơn', 'Quận Liên Chiểu',
-    'Quận Cẩm Lệ', 'Huyện Hòa Vang', 'Huyện Hoàng Sa'
-  ],
-  '92': [ // Cần Thơ
-    'Quận Ninh Kiều', 'Quận Ô Môn', 'Quận Bình Thủy', 'Quận Cái Răng', 'Quận Thốt Nốt',
-    'Huyện Vĩnh Thạnh', 'Huyện Cờ Đỏ', 'Huyện Phong Điền', 'Huyện Thới Lai'
-  ],
-  '31': [ // Hải Phòng
-    'Quận Hồng Bàng', 'Quận Ngô Quyền', 'Quận Lê Chân', 'Quận Hải An', 'Quận Kiến An',
-    'Quận Đồ Sơn', 'Quận Dương Kinh', 'Huyện Thủy Nguyên', 'Huyện An Dương', 'Huyện An Lão'
-  ],
-  '75': [ // Bình Dương
-    'Thành phố Thủ Dầu Một', 'Thị xã Bến Cát', 'Thị xã Tân Uyên', 'Thị xã Dĩ An', 
-    'Thị xã Thuận An', 'Huyện Bàu Bàng', 'Huyện Dầu Tiếng', 'Huyện Bắc Tân Uyên', 'Huyện Phú Giáo'
-  ],
-  '77': [ // Đồng Nai
-    'Thành phố Biên Hòa', 'Thành phố Long Khánh', 'Huyện Vĩnh Cửu', 'Huyện Tân Phú', 
-    'Huyện Định Quán', 'Huyện Trảng Bom', 'Huyện Thống Nhất', 'Huyện Cẩm Mỹ',
-    'Huyện Long Thành', 'Huyện Xuân Lộc', 'Huyện Nhơn Trạch'
-  ]
-};
+interface DistrictData {
+  id: string;
+  name: string;
+  division_type?: string;
+}
 
 interface LocationSelectorProps {
   selectedCityId?: string;
@@ -94,6 +54,18 @@ interface LocationSelectorProps {
   sx?: any;
 }
 
+// Top popular provinces with images
+const FEATURED_PROVINCES = [
+  { id: '1', name: 'Hà Nội', image: getImageUrl('img/cities/ha-noi.jpg') },
+  { id: '79', name: 'Hồ Chí Minh', image: getImageUrl('img/cities/ho-chi-minh.jpg') },
+  { id: '48', name: 'Đà Nẵng', image: getImageUrl('img/cities/da-nang.jpg') },
+  { id: '75', name: 'Bình Dương', image: getImageUrl('img/cities/binh-duong.jpg') },
+  { id: '77', name: 'Đồng Nai', image: getImageUrl('img/cities/dong-nai.jpg') }
+];
+
+// Fallback image if a province doesn't have one
+const DEFAULT_PROVINCE_IMAGE = getImageUrl('img/cities/default-city.jpg');
+
 const LocationSelector: React.FC<LocationSelectorProps> = ({ 
   selectedCityId = '',
   selectedCityName = '',
@@ -102,26 +74,71 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   placeholder = 'Chọn tỉnh thành',
   sx = {}
 }) => {
+  const theme = useTheme();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'city' | 'district'>('city');
-  const [selectedCity, setSelectedCity] = useState<{id: string, name: string} | null>(null);
+  const [selectedCity, setSelectedCity] = useState<CityData | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [districtSearchQuery, setDistrictSearchQuery] = useState('');
+  const [cities, setCities] = useState<CityData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tabValue, setTabValue] = useState(0); // 0: Featured, 1: All provinces
+
+  // Load all provinces data
+  useEffect(() => {
+    const loadProvinces = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const provincesData = await fetchAllProvinces();
+        
+        // Convert to the format our component expects
+        const formattedCities = provincesData.map((province: Province) => {
+          // Find if this province is in featured list to get the image
+          const featuredProvince = FEATURED_PROVINCES.find(
+            fp => fp.id === formatLocationCode(province.code)
+          );
+
+          return {
+            id: formatLocationCode(province.code),
+            name: province.name,
+            division_type: province.division_type,
+            image: featuredProvince?.image || DEFAULT_PROVINCE_IMAGE,
+            districts: province.districts?.map((district: District) => ({
+              id: formatLocationCode(district.code),
+              name: district.name,
+              division_type: district.division_type
+            }))
+          };
+        });
+        
+        setCities(formattedCities);
+      } catch (err) {
+        console.error('Failed to load provinces data:', err);
+        setError('Không thể tải danh sách tỉnh thành. Vui lòng thử lại sau.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadProvinces();
+  }, []);
 
   // Initialize selected city from props
   useEffect(() => {
-    if (selectedCityId) {
-      const city = CITIES.find(city => city.id === selectedCityId);
+    if (selectedCityId && cities.length > 0) {
+      const city = cities.find(city => city.id === selectedCityId);
       if (city) {
         setSelectedCity(city);
       }
-    } else if (selectedCityName) {
-      const city = CITIES.find(city => city.name.toLowerCase() === selectedCityName.toLowerCase());
+    } else if (selectedCityName && cities.length > 0) {
+      const city = cities.find(city => city.name.toLowerCase() === selectedCityName.toLowerCase());
       if (city) {
         setSelectedCity(city);
       }
     }
-  }, [selectedCityId, selectedCityName]);
+  }, [selectedCityId, selectedCityName, cities]);
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => {
@@ -129,26 +146,27 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     setActiveTab('city');
     setSearchQuery('');
     setDistrictSearchQuery('');
+    setTabValue(0); // Reset to featured tab
   };
 
-  const handleCitySelect = (city: {id: string, name: string}) => {
+  const handleCitySelect = (city: CityData) => {
     setSelectedCity(city);
     
     // If city has districts, show district selection
-    if (DISTRICTS[city.id as keyof typeof DISTRICTS]?.length > 0) {
+    if (city.districts && city.districts.length > 0) {
       setActiveTab('district');
     } else {
       // If no districts, complete selection
-    if (onLocationSelected) {
+      if (onLocationSelected) {
         onLocationSelected(city.id, city.name);
       }
       handleClose();
     }
   };
 
-  const handleDistrictSelect = (district: string) => {
+  const handleDistrictSelect = (district: DistrictData) => {
     if (selectedCity && onLocationSelected) {
-      onLocationSelected(selectedCity.id, selectedCity.name, district);
+      onLocationSelected(selectedCity.id, selectedCity.name, district.name);
     }
     handleClose();
   };
@@ -165,19 +183,53 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     handleClose();
   };
 
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  // Get featured cities with their full data from our cities array
+  const featuredCities = useMemo(() => {
+    if (cities.length === 0) return FEATURED_PROVINCES;
+    
+    return FEATURED_PROVINCES.map(featured => {
+      const fullData = cities.find(city => city.id === featured.id);
+      return fullData || featured;
+    });
+  }, [cities]);
+
   // Filter cities based on search query
-  const filteredCities = CITIES.filter(city => 
-    city.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCities = useMemo(() => {
+    return cities.filter(city => 
+      city.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [cities, searchQuery]);
+
+  // Group provinces alphabetically
+  const groupedProvinces = useMemo(() => {
+    if (cities.length === 0) return {};
+
+    return filteredCities.reduce((acc: {[key: string]: CityData[]}, city) => {
+      // Use first character as key
+      const firstChar = city.name.charAt(0).toUpperCase();
+      if (!acc[firstChar]) {
+        acc[firstChar] = [];
+      }
+      acc[firstChar].push(city);
+      return acc;
+    }, {});
+  }, [filteredCities]);
+
+  // Alphabetical groups sorted
+  const sortedGroups = useMemo(() => {
+    return Object.keys(groupedProvinces).sort();
+  }, [groupedProvinces]);
 
   // Get districts for selected city
-  const cityDistricts = selectedCity && DISTRICTS[selectedCity.id as keyof typeof DISTRICTS] 
-    ? DISTRICTS[selectedCity.id as keyof typeof DISTRICTS] 
-    : [];
+  const cityDistricts = selectedCity?.districts || [];
   
   // Filter districts based on search query
   const filteredDistricts = cityDistricts.filter(district => 
-    district.toLowerCase().includes(districtSearchQuery.toLowerCase())
+    district.name.toLowerCase().includes(districtSearchQuery.toLowerCase())
   );
 
   // Display name in the selector
@@ -246,142 +298,320 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
           sx={{
             position: 'relative',
             width: '100%',
-            maxWidth: 600,
+            maxWidth: 800,
             maxHeight: '90vh',
             overflow: 'hidden',
-            p: 0,
-            outline: 'none',
-            borderRadius: 2,
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            borderRadius: 2
           }}
         >
-          {/* Header */}
-          <Box sx={{ 
-            position: 'sticky', 
-            top: 0, 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            p: 2,
-            backgroundColor: 'white',
-            borderBottom: '1px solid #e0e0e0',
-            zIndex: 10
-          }}>
-            <Typography variant="h6" component="h2">
-              {activeTab === 'city' ? 'Chọn tỉnh/thành phố' : `Chọn quận/huyện tại ${selectedCity?.name}`}
-            </Typography>
-            <IconButton 
-              onClick={handleClose}
-              size="small"
-              sx={{ ml: 2 }}
-            >
-              <CloseIcon />
-            </IconButton>
-          </Box>
+          {/* Close button */}
+          <IconButton 
+            aria-label="close" 
+            onClick={handleClose}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+              zIndex: 10
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
 
-          {/* Search box */}
-          <Box sx={{ p: 2, backgroundColor: 'white' }}>
-            <TextField
-              fullWidth
-              placeholder={activeTab === 'city' ? "Tìm kiếm tỉnh/thành phố..." : "Tìm kiếm quận/huyện..."}
-              size="small"
-              value={activeTab === 'city' ? searchQuery : districtSearchQuery}
-              onChange={(e) => activeTab === 'city' ? setSearchQuery(e.target.value) : setDistrictSearchQuery(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Box>
+          {activeTab === 'city' ? (
+            /* City selection */
+            <>
+              <Box sx={{ p: 3, pb: 2 }}>
+                <Typography variant="h6" component="h2" fontWeight="bold">
+                  Chọn tỉnh/thành phố
+                </Typography>
 
-          {/* Content */}
-          <Box sx={{ 
-            flexGrow: 1, 
-            overflow: 'auto',
-            maxHeight: '50vh',
-            p: 0
-          }}>
-            {activeTab === 'city' ? (
-              <List disablePadding>
-                {filteredCities.map((city) => (
-                  <React.Fragment key={city.id}>
-                    <ListItem 
-                      button 
-                      onClick={() => handleCitySelect(city)}
-                      selected={selectedCity?.id === city.id}
-                    >
-                      <ListItemText primary={city.name} />
-                    </ListItem>
-                    <Divider component="li" />
-                  </React.Fragment>
-                ))}
-                {filteredCities.length === 0 && (
-                  <ListItem>
-                    <ListItemText primary="Không tìm thấy kết quả phù hợp" />
-                  </ListItem>
-                )}
-              </List>
-            ) : (
-              <List disablePadding>
-                {filteredDistricts.map((district) => (
-                  <React.Fragment key={district}>
-                    <ListItem 
-                      button 
-                      onClick={() => handleDistrictSelect(district)}
-                      selected={selectedDistrict === district}
-                    >
-                      <ListItemText primary={district} />
-                    </ListItem>
-                    <Divider component="li" />
-                  </React.Fragment>
-                ))}
-                {filteredDistricts.length === 0 && (
-                  <ListItem>
-                    <ListItemText primary="Không tìm thấy kết quả phù hợp" />
-                  </ListItem>
-                )}
-              </List>
-            )}
-          </Box>
-          
-          {/* Footer */}
-          <Box sx={{ 
-            position: 'sticky', 
-            bottom: 0,
-            display: 'flex', 
-            justifyContent: activeTab === 'district' ? 'space-between' : 'flex-end', 
-            p: 2,
-            backgroundColor: 'white',
-            borderTop: '1px solid #e0e0e0',
-          }}>
-            {activeTab === 'district' && (
-              <>
+                <TextField 
+                  fullWidth
+                  placeholder="Tìm tỉnh/thành phố"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  margin="normal"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ mt: 2 }}
+                />
+              </Box>
+
+              <Divider />
+
+              {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4, height: '60vh' }}>
+                  <CircularProgress />
+                </Box>
+              ) : error ? (
+                <Box sx={{ p: 3, textAlign: 'center', height: '60vh' }}>
+                  <Typography color="error">{error}</Typography>
+                  <Button 
+                    variant="contained" 
+                    onClick={() => window.location.reload()} 
+                    sx={{ mt: 2 }}
+                  >
+                    Tải lại
+                  </Button>
+                </Box>
+              ) : searchQuery ? (
+                // Show search results
+                <Box sx={{ overflow: 'auto', maxHeight: '70vh', p: 3 }}>
+                  {filteredCities.length > 0 ? (
+                    <Grid container spacing={2}>
+                      {filteredCities.map((city) => (
+                        <Grid item xs={6} sm={4} md={3} key={city.id}>
+                          <Button 
+                            fullWidth
+                            onClick={() => handleCitySelect(city)}
+                            sx={{ 
+                              textAlign: 'left', 
+                              justifyContent: 'flex-start',
+                              textTransform: 'none',
+                              py: 1
+                            }}
+                          >
+                            <Typography color="textPrimary">
+                              {city.name}
+                            </Typography>
+                          </Button>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  ) : (
+                    <Typography align="center">
+                      Không tìm thấy tỉnh/thành phố nào
+                    </Typography>
+                  )}
+                </Box>
+              ) : (
+                <Box sx={{ overflow: 'auto', maxHeight: '70vh' }}>
+                  <Tabs 
+                    value={tabValue} 
+                    onChange={handleTabChange}
+                    variant="fullWidth"
+                    sx={{ borderBottom: 1, borderColor: 'divider' }}
+                  >
+                    <Tab label="Tỉnh thành nổi bật" />
+                    <Tab label="Tất cả tỉnh thành" />
+                  </Tabs>
+
+                  {tabValue === 0 ? (
+                    // Featured provinces
+                    <Box sx={{ p: 3 }}>
+                      <Typography 
+                        variant="h6" 
+                        component="h3" 
+                        fontWeight="bold" 
+                        sx={{ mb: 2, fontSize: '1rem' }}
+                      >
+                        Top tỉnh thành nổi bật
+                      </Typography>
+                      <Grid container spacing={2}>
+                        {featuredCities.map((city) => (
+                          <Grid item xs={6} sm={4} key={city.id}>
+                            <Card 
+                              sx={{ 
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                '&:hover': {
+                                  transform: 'translateY(-4px)',
+                                  boxShadow: 4
+                                },
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column'
+                              }}
+                              onClick={() => handleCitySelect(city)}
+                            >
+                              <CardMedia
+                                component="img"
+                                height="120"
+                                image={city.image}
+                                alt={city.name}
+                                sx={{
+                                  position: 'relative',
+                                  '&::after': {
+                                    content: '""',
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: '100%',
+                                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.6))',
+                                  }
+                                }}
+                              />
+                              <CardContent 
+                                sx={{ 
+                                  p: 1.5, 
+                                  textAlign: 'center',
+                                  height: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                <Typography variant="body1" component="div" fontWeight="500">
+                                  {city.name}
+                                </Typography>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </Box>
+                  ) : (
+                    // All provinces grouped alphabetically
+                    <Box sx={{ p: 3 }}>
+                      <Typography 
+                        variant="h6" 
+                        component="h3" 
+                        fontWeight="bold" 
+                        sx={{ mb: 3, fontSize: '1rem' }}
+                      >
+                        Danh sách tỉnh thành
+                      </Typography>
+
+                      {sortedGroups.map((letter) => (
+                        <Box key={letter} sx={{ mb: 3 }}>
+                          <Typography 
+                            variant="subtitle1" 
+                            sx={{ 
+                              mb: 1,
+                              fontWeight: 'bold',
+                              color: theme.palette.primary.main
+                            }}
+                          >
+                            {letter}
+                          </Typography>
+                          <Grid container spacing={1}>
+                            {groupedProvinces[letter].map((city) => (
+                              <Grid item xs={6} sm={4} md={3} key={city.id}>
+                                <Button 
+                                  fullWidth
+                                  onClick={() => handleCitySelect(city)}
+                                  sx={{ 
+                                    textAlign: 'left', 
+                                    justifyContent: 'flex-start',
+                                    textTransform: 'none',
+                                    py: 1
+                                  }}
+                                >
+                                  <Typography color="textPrimary">
+                                    {city.name}
+                                  </Typography>
+                                </Button>
+                              </Grid>
+                            ))}
+                          </Grid>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </>
+          ) : (
+            /* District selection */
+            <>
+              <Box sx={{ p: 3, pb: 2 }}>
                 <Button 
-                  onClick={handleBackToCity} 
-                  color="inherit"
-                  startIcon={<KeyboardArrowDownIcon sx={{ transform: 'rotate(90deg)' }} />}
-                >
-                  Quay lại
-                </Button>
-                <Button 
-                  onClick={handleCompleteWithoutDistrict} 
+                  onClick={handleBackToCity}
+                  sx={{ mb: 2, pl: 0 }}
                   color="primary"
-                  variant="contained"
                 >
-                  Chọn toàn {selectedCity?.name}
+                  ← Quay lại
                 </Button>
-              </>
-            )}
-            {activeTab === 'city' && (
-            <Button onClick={handleClose} color="inherit">
-              Đóng
-            </Button>
-            )}
-          </Box>
+                <Typography variant="h6" component="h2" fontWeight="bold">
+                  {selectedCity?.name}: Chọn quận/huyện
+                </Typography>
+
+                <TextField 
+                  fullWidth
+                  placeholder="Tìm quận/huyện"
+                  value={districtSearchQuery}
+                  onChange={(e) => setDistrictSearchQuery(e.target.value)}
+                  margin="normal"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ mt: 2 }}
+                />
+              </Box>
+
+              <Divider />
+              
+              <Box sx={{ overflow: 'auto', maxHeight: '70vh', p: 3 }}>
+                {filteredDistricts.length > 0 ? (
+                  <>
+                    <Box 
+                      sx={{ 
+                        p: 2, 
+                        mb: 3, 
+                        borderRadius: 1, 
+                        bgcolor: theme.palette.primary.main,
+                        color: 'white',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          bgcolor: theme.palette.primary.dark,
+                        }
+                      }}
+                      onClick={handleCompleteWithoutDistrict}
+                    >
+                      <Typography fontWeight="bold">
+                        Tất cả {selectedCity?.name}
+                      </Typography>
+                    </Box>
+                    
+                    <Grid container spacing={2}>
+                      {filteredDistricts.map((district) => (
+                        <Grid item xs={6} sm={4} key={district.id}>
+                          <Button 
+                            fullWidth
+                            variant="outlined"
+                            onClick={() => handleDistrictSelect(district)}
+                            sx={{ 
+                              textAlign: 'left', 
+                              justifyContent: 'flex-start',
+                              textTransform: 'none',
+                              py: 1.5,
+                              borderColor: '#e0e0e0',
+                              '&:hover': {
+                                borderColor: theme.palette.primary.main,
+                                bgcolor: 'rgba(0,0,0,0.01)'
+                              }
+                            }}
+                          >
+                            <Typography color="textPrimary">
+                              {district.name}
+                            </Typography>
+                          </Button>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </>
+                ) : (
+                  <Typography align="center">
+                    Không tìm thấy quận/huyện nào
+                  </Typography>
+                )}
+              </Box>
+            </>
+          )}
         </Paper>
       </Modal>
     </>

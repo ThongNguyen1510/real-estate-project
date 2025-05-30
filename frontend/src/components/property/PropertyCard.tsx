@@ -300,22 +300,24 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             fontWeight: 'bold',
             mb: 1,
             display: '-webkit-box',
-            WebkitLineClamp: 2,
+            WebkitLineClamp: 3,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            height: '2.75rem'
+            lineHeight: '1.3',
+            minHeight: '4.2rem'
           }}
         >
           {title}
         </Typography>
         
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1.5 }}>
           <LocationIcon 
             sx={{ 
               fontSize: '1rem', 
               color: 'text.secondary',
-              mr: 0.5
+              mr: 0.5,
+              mt: 0.25
             }} 
           />
           <Typography 
@@ -323,10 +325,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             color="text.secondary"
             sx={{
               display: '-webkit-box',
-              WebkitLineClamp: 1,
+              WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              fontSize: '0.875rem'
+              fontSize: '0.875rem',
+              lineHeight: '1.3'
             }}
           >
             {formatLocation()}

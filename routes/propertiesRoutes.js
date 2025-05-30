@@ -61,6 +61,10 @@ router.post('/:id/favorite', authenticateToken, async (req, res) => {
         VALUES (@propertyId, @userId, GETDATE())
       `);
       
+      // Gửi thông báo cho chủ tin đăng
+      const notificationController = require('../controllers/notificationController');
+      notificationController.createPropertyFavoritedNotification(id, userId);
+      
       return res.json({
         success: true,
         message: 'Đã thêm vào danh sách yêu thích',

@@ -454,10 +454,37 @@ const getReportDetail = async (reportId) => {
     }
 };
 
+/**
+ * Lấy thông tin báo cáo theo ID
+ */
+const getReportById = async (reportId) => {
+    try {
+        const request = new sql.Request();
+        request.input('reportId', sql.Int, reportId);
+        
+        const result = await request.query(`
+            SELECT r.id, r.reason, r.description, r.status, r.reporter_id,
+                   p.id as property_id, p.title as property_title, p.owner_id as property_owner_id
+            FROM PropertyReports r
+            JOIN Properties p ON r.property_id = p.id
+            WHERE r.id = @reportId
+        `);
+        
+        if (result.recordset.length > 0) {
+            return result.recordset[0];
+        }
+        return null;
+    } catch (error) {
+        console.error('Error getting report by ID:', error);
+        throw error;
+    }
+};
+
 module.exports = {
     createPropertyReport,
     getUserReports,
     getAllPropertyReports,
     updateReportStatus,
-    getReportDetail
+    getReportDetail,
+    getReportById
 }; 
